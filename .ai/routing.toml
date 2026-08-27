@@ -1,0 +1,22 @@
+[tiers.cheap]
+model = "openrouter/deepseek/deepseek-v4-flash-0731"
+
+[tiers.standard]
+model = "openrouter/deepseek/deepseek-v4-pro-0813"
+
+[tiers.strong]
+model = "auto:openai-codex"
+
+[policy]
+max_escalations = 2
+target_philosophy = "60/30/10"
+
+[candidates]
+cheap = [
+  "openrouter/deepseek/deepseek-v4-flash",
+]
+standard = [
+  "openrouter/z-ai/glm-5.2",
+  "nvidia_nim/deepseek-ai/deepseek-v4-pro-0813",
+]
+strong = []

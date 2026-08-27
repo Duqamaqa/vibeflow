@@ -1,0 +1,23 @@
+[project]
+name = "vibeflow"
+version = "0.3.0"
+description = "Dependency-light AI coding orchestrator for the FCC gateway"
+authors = [{name = "Vibeflow"}]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+vibeflow = "vibeflow.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.package-data]
+vibeflow = ["ui/*.html", "ui/*.css", "ui/*.js"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

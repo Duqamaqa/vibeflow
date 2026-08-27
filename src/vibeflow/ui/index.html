@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0b0d0c">
+  <title>Vibeflow — Local coding control room</title>
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <a class="skip-link" href="#composer">Skip to prompt</a>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div>
+          <p class="eyebrow">LOCAL CONTROL ROOM</p>
+          <h1>Vibeflow</h1>
+        </div>
+      </div>
+
+      <nav class="primary-nav" aria-label="Primary navigation">
+        <button class="nav-item active" type="button" data-scroll="composer"><span>01</span> New task</button>
+        <button class="nav-item" type="button" data-scroll="pipeline"><span>02</span> Pipeline</button>
+        <button class="nav-item" type="button" data-scroll="evidence"><span>03</span> Evidence</button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+
+      <section class="connection-card" aria-labelledby="connection-title">
+        <div class="section-label-row">
+          <p id="connection-title" class="eyebrow">SYSTEM</p>
+          <span id="system-dot" class="status-dot loading" aria-hidden="true"></span>
+        </div>
+        <p id="system-label" class="connection-title">Checking local services…</p>
+        <p id="system-detail" class="muted">FCC · Git · routing</p>
+      </section>
+
+      <div class="privacy-note">
+        <span class="privacy-icon" aria-hidden="true">⌁</span>
+        <p><strong>Private by default.</strong><br>No keys enter this browser.</p>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div class="repo-control">
+          <label for="repo-input">Target repository</label>
+          <div class="repo-field">
+            <span aria-hidden="true">⌘</span>
+            <input id="repo-input" type="text" spellcheck="false" autocomplete="off" aria-describedby="repo-help">
+            <button id="load-repo" class="icon-button" type="button" aria-label="Load repository">↗</button>
+          </div>
+          <p id="repo-help" class="sr-only">Enter the full path to a local Git repository.</p>
+        </div>
+        <div class="topbar-actions">
+          <span id="git-badge" class="quiet-badge">Git · checking</span>
+          <button id="refresh-button" class="icon-button" type="button" aria-label="Refresh dashboard">↻</button>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <section class="hero-panel" id="composer" aria-labelledby="composer-title">
+          <div class="hero-copy">
+            <p class="eyebrow accent">YOUR DAILY CODING FRONT DOOR</p>
+            <h2 id="composer-title">Describe the outcome.<br><em>Vibeflow handles the route.</em></h2>
+            <p>One prompt becomes a scoped contract, isolated changes, deterministic checks, and an independent review.</p>
+          </div>
+
+          <form id="prompt-form" class="prompt-card">
+            <div class="prompt-header">
+              <span class="prompt-number">TASK / 001</span>
+              <span id="character-count">0 / 20,000</span>
+            </div>
+            <label class="sr-only" for="prompt-input">Coding request</label>
+            <textarea id="prompt-input" maxlength="20000" rows="7" placeholder="e.g. Fix the checkout race condition, add a regression test, and preserve the public API."></textarea>
+            <div class="prompt-footer">
+              <label class="approval-toggle">
+                <input id="approval-input" type="checkbox">
+                <span class="toggle-track" aria-hidden="true"><span></span></span>
+                <span>Approve flagged high-risk scope</span>
+              </label>
+              <div class="prompt-actions">
+                <button id="plan-button" class="secondary-button" type="button">Plan only</button>
+                <button id="run-button" class="primary-button" type="submit">
+                  <span>Run safely</span><span aria-hidden="true">→</span>
+                </button>
+              </div>
+            </div>
+          </form>
+          <p class="keyboard-hint"><kbd>⌘</kbd><span>+</span><kbd>Enter</kbd> runs the task · no automatic commit, push, or deploy</p>
+        </section>
+
+        <aside class="model-rail" aria-labelledby="models-title">
+          <div class="rail-heading">
+            <div>
+              <p class="eyebrow">MODEL ROUTE</p>
+              <h2 id="models-title">Three gears.<br>One standard.</h2>
+            </div>
+            <span class="rail-rule" aria-hidden="true"></span>
+          </div>
+          <div id="model-cards" class="model-cards" aria-live="polite">
+            <div class="model-skeleton"></div><div class="model-skeleton"></div><div class="model-skeleton"></div>
+          </div>
+          <p class="rail-footnote">The cheapest qualified model starts. Failure or uncertainty escalates—never loops forever.</p>
+        </aside>
+
+        <section class="pipeline-panel" id="pipeline" aria-labelledby="pipeline-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">AUTONOMOUS FLOW</p>
+              <h2 id="pipeline-title">From request to reviewed diff</h2>
+            </div>
+            <span id="task-status-badge" class="status-pill idle">Waiting for a task</span>
+          </div>
+          <ol id="pipeline-steps" class="pipeline-steps">
+            <li data-step="contract"><span class="step-index">01</span><div><strong>Contract</strong><small>Scope & approval</small></div><span class="step-state">—</span></li>
+            <li data-step="route"><span class="step-index">02</span><div><strong>Route</strong><small>Model & strategy</small></div><span class="step-state">—</span></li>
+            <li data-step="workspace"><span class="step-index">03</span><div><strong>Isolate</strong><small>Safe worktree</small></div><span class="step-state">—</span></li>
+            <li data-step="worker"><span class="step-index">04</span><div><strong>Build</strong><small>Structured change</small></div><span class="step-state">—</span></li>
+            <li data-step="verify"><span class="step-index">05</span><div><strong>Verify</strong><small>Tests & checks</small></div><span class="step-state">—</span></li>
+            <li data-step="review"><span class="step-index">06</span><div><strong>Review</strong><small>Fresh context</small></div><span class="step-state">—</span></li>
+            <li data-step="promote"><span class="step-index">07</span><div><strong>Apply</strong><small>Hash-guarded</small></div><span class="step-state">—</span></li>
+          </ol>
+        </section>
+
+        <section class="evidence-panel" id="evidence" aria-labelledby="evidence-title">
+          <div class="panel-heading evidence-heading">
+            <div>
+              <p class="eyebrow">TASK EVIDENCE</p>
+              <h2 id="evidence-title">What actually happened</h2>
+            </div>
+            <button id="copy-output" class="text-button" type="button" disabled>Copy summary</button>
+          </div>
+          <div class="tab-list" role="tablist" aria-label="Task evidence">
+            <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="summary">Summary</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" data-tab="diff">Diff</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" data-tab="raw">Full report</button>
+          </div>
+          <div id="empty-evidence" class="empty-evidence">
+            <span class="empty-glyph" aria-hidden="true">⌁</span>
+            <h3>Evidence lands here.</h3>
+            <p>Run or plan a task to see routing, changed files, verification, reviewer judgment, and the generated diff.</p>
+          </div>
+          <div id="evidence-content" class="evidence-content" hidden>
+            <div id="summary-tab" class="tab-panel"></div>
+            <pre id="diff-tab" class="tab-panel code-panel" hidden></pre>
+            <pre id="raw-tab" class="tab-panel code-panel" hidden></pre>
+          </div>
+        </section>
+
+        <aside class="safety-panel" aria-labelledby="safety-title">
+          <p class="eyebrow">GUARDRAILS</p>
+          <h2 id="safety-title">Autonomy with a hard edge.</h2>
+          <ul class="safety-list">
+            <li><span>✓</span> Changes apply in isolation</li>
+            <li><span>✓</span> Dirty files stay protected</li>
+            <li><span>✓</span> Secrets and Git internals denied</li>
+            <li><span>✓</span> Fresh reviewer sees no hidden reasoning</li>
+            <li><span>—</span> Never commits, pushes, or deploys</li>
+          </ul>
+          <div class="safety-stamp">
+            <span>LOCALHOST</span><strong>127.0.0.1</strong>
+          </div>
+        </aside>
+      </div>
+
+      <footer>
+        <span>VIBEFLOW / LOCAL AI CODING ORCHESTRATOR</span>
+        <span id="footer-repo">No repository loaded</span>
+      </footer>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>
