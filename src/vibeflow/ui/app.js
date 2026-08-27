@@ -45,6 +45,12 @@ const elements = {
   skillRisk: document.querySelector("#skill-risk"),
   skillInstructions: document.querySelector("#skill-instructions"),
   statusBadge: document.querySelector("#task-status-badge"),
+  taskAlert: document.querySelector("#task-alert"),
+  taskAlertKicker: document.querySelector("#task-alert-kicker"),
+  taskAlertTitle: document.querySelector("#task-alert-title"),
+  taskAlertReason: document.querySelector("#task-alert-reason"),
+  taskAlertAction: document.querySelector("#task-alert-action"),
+  viewTaskDetails: document.querySelector("#view-task-details"),
   pipelineSteps: [...document.querySelectorAll("#pipeline-steps li")],
   emptyEvidence: document.querySelector("#empty-evidence"),
   evidenceContent: document.querySelector("#evidence-content"),
@@ -328,6 +334,8 @@ function startPolling(taskId) {
 }
 
 function resetPipeline() {
+  elements.taskAlert.hidden = true;
+  elements.taskAlert.className = "task-alert";
   for (const step of elements.pipelineSteps) {
     step.className = "";
     step.querySelector(".step-state").textContent = "—";
@@ -343,7 +351,7 @@ function resetEvidence() {
 
 function renderTask(task) {
   const status = task.status || "queued";
-  elements.statusBadge.textContent = status.replaceAll("-", " ");
+  elements.statusBadge.textContent = status === "blocked" ? "stopped safely" : status.replaceAll("-", " ");
   elements.statusBadge.className = `status-pill ${status}`;
   resetPipeline();
   if (["queued", "running"].includes(status)) {
@@ -356,12 +364,72 @@ function renderTask(task) {
   }
   const planned = task.action === "plan" || status === "planned";
   const success = status === "done" || status === "planned";
-  const finishIndex = planned ? 2 : 7;
-  elements.pipelineSteps.forEach((step, index) => {
-    if (index < finishIndex) markStep(step, success ? "complete" : "failed", success ? "✓" : "!");
-  });
-  if (!success && finishIndex < elements.pipelineSteps.length) markStep(elements.pipelineSteps[finishIndex], "failed", "!");
+  if (success) {
+    const finishIndex = planned ? 3 : 7;
+    elements.pipelineSteps.forEach((step, index) => {
+      if (index < finishIndex) markStep(step, "complete", "✓");
+    });
+  } else {
+    const failure = explainTaskFailure(task);
+    elements.pipelineSteps.forEach((step, index) => {
+      if (index < failure.stageIndex) markStep(step, "complete", "✓");
+      else if (index === failure.stageIndex) markStep(step, "failed", "!");
+    });
+    showTaskAlert(status, failure);
+  }
   renderEvidence(task.result, task.error, task);
+}
+
+function taskFailureText(task) {
+  const data = task.result || {};
+  const resolution = data.resolution || {};
+  const worker = resolution.worker || {};
+  const review = resolution.review || {};
+  return task.error || data.blocker || resolution.blocker || review.feedback || worker.summary || "Vibeflow stopped before it could safely finish the task.";
+}
+
+function explainTaskFailure(task) {
+  const status = task.status || "blocked";
+  const data = task.result || {};
+  const resolution = data.resolution || {};
+  const worker = resolution.worker || {};
+  const review = resolution.review || {};
+  const verification = resolution.verification || {};
+  const reason = taskFailureText(task);
+  const normalized = reason.toLowerCase();
+
+  if (status === "needs-approval") {
+    return { stageIndex: 0, reason, action: "Review the requested scope, enable the approval checkbox near your prompt, and run the task again." };
+  }
+  if (normalized.includes("fcc") || normalized.includes("model") || normalized.includes("provider") || normalized.includes("route")) {
+    return { stageIndex: 1, reason, action: "Check that FCC is running and that the configured model provider is connected, then retry." };
+  }
+  if (normalized.includes("worktree") || normalized.includes("workspace") || normalized.includes("git repository") || normalized.includes("isolate")) {
+    return { stageIndex: 2, reason, action: "Confirm the selected folder is an accessible Git repository, then retry." };
+  }
+  if (worker.success === false || normalized.includes("structured proposal") || normalized.includes("invalid json") || normalized.includes("worker")) {
+    return { stageIndex: 3, reason, action: "The coding model did not return a safe structured change. Retry or let routing escalate to a stronger model." };
+  }
+  if (verification.accepted === false || /\b(test|tests|lint|typecheck|verification|build)\b/.test(normalized)) {
+    return { stageIndex: 4, reason, action: "Open the task details to see which deterministic check failed, then ask Vibeflow to fix that failure." };
+  }
+  if (review.approved === false || normalized.includes("review") || normalized.includes("resolver") || normalized.includes("iteration")) {
+    return { stageIndex: 5, reason, action: "The independent reviewer rejected the change and the repair limit was reached. Use its feedback in a new prompt." };
+  }
+  if (normalized.includes("promot") || normalized.includes("apply") || normalized.includes("hash") || normalized.includes("dirty") || normalized.includes("stale")) {
+    return { stageIndex: 6, reason, action: "Your project changed while Vibeflow was working, so safe apply was cancelled. Review local changes and retry." };
+  }
+  return { stageIndex: 1, reason, action: "Open the full details below for the exact technical report. Your project was not changed." };
+}
+
+function showTaskAlert(status, failure) {
+  const approval = status === "needs-approval";
+  elements.taskAlert.hidden = false;
+  elements.taskAlert.classList.toggle("needs-approval", approval);
+  elements.taskAlertKicker.textContent = approval ? "YOUR APPROVAL IS NEEDED" : "STOPPED SAFELY";
+  elements.taskAlertTitle.textContent = approval ? "Vibeflow paused before making changes." : "Vibeflow did not apply unverified changes.";
+  elements.taskAlertReason.textContent = failure.reason;
+  elements.taskAlertAction.textContent = `Next step: ${failure.action}`;
 }
 
 function renderPersistedTask(lastTask) {
@@ -416,7 +484,7 @@ function renderEvidence(result, error, task) {
   }
 
   elements.summaryTab.replaceChildren(grid);
-  addSummarySection("Outcome", error || data.blocker || worker.summary || review.feedback || (task.action === "plan" ? "Plan prepared without changing files." : "Task completed."));
+  addSummarySection("Outcome", error || data.blocker || resolution.blocker || worker.summary || review.feedback || (task.action === "plan" ? "Plan prepared without changing files." : "Task completed."));
   addSummarySection("Reviewer", reviewState + (review.feedback ? ` — ${review.feedback}` : ""));
   addSummarySection("Skills", (data.skills || task.selected_skills || []).join(", ") || "No reusable skills selected.");
   if (changedFiles.length) addFilesSection(changedFiles);
@@ -617,6 +685,9 @@ elements.createSkill.addEventListener("click", openSkillDialog);
 elements.skillForm.addEventListener("submit", createSkill);
 elements.closeSkillDialog.addEventListener("click", closeSkillDialog);
 elements.cancelSkill.addEventListener("click", closeSkillDialog);
+elements.viewTaskDetails.addEventListener("click", () => {
+  document.querySelector("#evidence").scrollIntoView({ behavior: "smooth" });
+});
 elements.tabs.forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
 elements.copyOutput.addEventListener("click", async () => {
   if (!state.task) return;

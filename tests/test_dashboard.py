@@ -344,6 +344,8 @@ class TestDashboardAssets(unittest.TestCase):
         self.assertIn('id="browse-repo"', html)
         self.assertIn('id="skill-dialog"', html)
         self.assertIn('id="engine-list"', html)
+        self.assertIn('id="task-alert"', html)
+        self.assertIn("Show full details", html)
         self.assertIn("Built in—nothing to import", html)
         self.assertIn("Import skill folder", html)
         self.assertIn("prefers-reduced-motion", css)
@@ -352,6 +354,8 @@ class TestDashboardAssets(unittest.TestCase):
         self.assertNotIn("localStorage", javascript)
         self.assertNotIn("sessionStorage", javascript)
         self.assertIn('skills: [...state.selectedSkills]', javascript)
+        self.assertIn("function explainTaskFailure(task)", javascript)
+        self.assertIn('status === "blocked" ? "stopped safely"', javascript)
 
 
 if __name__ == "__main__":

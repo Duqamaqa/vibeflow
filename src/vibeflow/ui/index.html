@@ -179,6 +179,16 @@
             <li data-step="review"><span class="step-index">06</span><div><strong>Review</strong><small>Fresh context</small></div><span class="step-state">—</span></li>
             <li data-step="promote"><span class="step-index">07</span><div><strong>Apply</strong><small>Hash-guarded</small></div><span class="step-state">—</span></li>
           </ol>
+          <div id="task-alert" class="task-alert" role="status" aria-live="polite" hidden>
+            <div class="task-alert-mark" aria-hidden="true">!</div>
+            <div>
+              <p id="task-alert-kicker" class="task-alert-kicker">STOPPED SAFELY</p>
+              <h3 id="task-alert-title">Vibeflow did not change your project.</h3>
+              <p id="task-alert-reason" class="task-alert-reason"></p>
+              <p id="task-alert-action" class="task-alert-action"></p>
+              <button id="view-task-details" class="text-button task-alert-button" type="button">Show full details ↓</button>
+            </div>
+          </div>
         </section>
 
         <section class="evidence-panel" id="evidence" aria-labelledby="evidence-title">
