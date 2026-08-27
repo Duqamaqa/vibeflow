@@ -252,7 +252,7 @@ Clear low-risk tasks may proceed automatically. Material ambiguity, production d
 
 The checked-in defaults selected on August 27, 2026 are:
 
-- **Cheap:** `nvidia_nim/deepseek-ai/deepseek-v4-flash-0731`
+- **Cheap:** `open_router/deepseek/deepseek-v4-flash-0731` (the NVIDIA NIM route remains a configured fallback)
 - **Standard:** `open_router/deepseek/deepseek-v4-pro-0813`
 - **Strong:** `auto:openai-codex`
 

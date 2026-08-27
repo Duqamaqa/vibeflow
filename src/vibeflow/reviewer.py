@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import ast
 import json
+import math
 from typing import Any, Mapping
 
 from .context import ContextBundle
@@ -93,11 +94,25 @@ class Reviewer:
             changes = [changes]
         if not isinstance(changes, list):
             changes = []
+        approved_value = payload.get("approved", False)
+        approved = approved_value if isinstance(approved_value, bool) else False
+        confidence_value = payload.get("confidence", 0.0)
+        valid_confidence = (
+            not isinstance(confidence_value, bool)
+            and isinstance(confidence_value, (int, float))
+            and math.isfinite(float(confidence_value))
+        )
+        confidence = max(0.0, min(1.0, float(confidence_value))) if valid_confidence else 0.0
+        feedback = str(payload.get("feedback", ""))
+        if not isinstance(approved_value, bool):
+            feedback = f"Invalid reviewer response: approved must be a JSON boolean. {feedback}".strip()
+        if not valid_confidence:
+            feedback = f"Invalid reviewer response: confidence must be a finite JSON number. {feedback}".strip()
         return ReviewResult(
-            approved=bool(payload.get("approved", False)),
-            feedback=str(payload.get("feedback", "")),
+            approved=approved,
+            feedback=feedback,
             required_changes=tuple(str(change) for change in changes if str(change).strip()),
-            confidence=max(0.0, min(1.0, float(payload.get("confidence", 0.0)))),
+            confidence=confidence,
             request_id=request_id,
             usage=usage,
         )

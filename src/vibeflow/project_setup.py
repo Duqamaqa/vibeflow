@@ -25,12 +25,12 @@ INIT_MEMORY_FILES: Mapping[str, str] = {
     ".ai/decisions.md": "# Decisions\n\nRecord durable architecture decisions here.\n",
     ".ai/coding_rules.md": "# Coding rules\n\n- Preserve unrelated changes.\n- Require deterministic verification.\n",
     ".ai/routing.toml": (
-        "[tiers.cheap]\nmodel = \"nvidia_nim/deepseek-ai/deepseek-v4-flash-0731\"\n\n"
+        "[tiers.cheap]\nmodel = \"open_router/deepseek/deepseek-v4-flash-0731\"\n\n"
         "[tiers.standard]\nmodel = \"open_router/deepseek/deepseek-v4-pro-0813\"\n\n"
         "[tiers.strong]\nmodel = \"auto:openai-codex\"\n\n"
         "[policy]\nmax_escalations = 2\n\n"
         "[candidates]\n"
-        "cheap = [\"open_router/deepseek/deepseek-v4-flash-0731\"]\n"
+        "cheap = [\"nvidia_nim/deepseek-ai/deepseek-v4-flash-0731\"]\n"
         "standard = [\"open_router/z-ai/glm-5.2\", \"open_router/moonshotai/kimi-k3\"]\n"
         "strong = []\n"
     ),

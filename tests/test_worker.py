@@ -42,6 +42,48 @@ class TestWorkerStructuredOutput(unittest.TestCase):
         self.assertIsNone(result.proposal)
         self.assertEqual(result.diff, "")
 
+    def test_extracts_one_structured_proposal_after_provider_reasoning(self):
+        payload = {
+            "success": True,
+            "summary": "created docs",
+            "operations": [{
+                "op": "create",
+                "path": "README.md",
+                "content": "Description\n",
+            }],
+            "uncertainty": 0.0,
+        }
+
+        result = Worker._parse_response(
+            f"I will now return the requested object.\n{json.dumps(payload)}",
+            usage={},
+            request_id="request-wrapped",
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.changed_files, ("README.md",))
+
+    def test_empty_uncertainty_list_is_treated_as_no_uncertainty(self):
+        payload = {
+            "success": True,
+            "summary": "created docs",
+            "operations": [{
+                "op": "create",
+                "path": "README.md",
+                "content": "Description\n",
+            }],
+            "uncertainty": [],
+        }
+
+        result = Worker._parse_response(
+            json.dumps(payload),
+            usage={},
+            request_id="request-empty-list",
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.uncertainty, 0.0)
+
     def test_list_uncertainty_fails_closed_without_raising(self):
         payload = {
             "success": True,

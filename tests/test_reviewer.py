@@ -36,6 +36,16 @@ class TestReviewer(unittest.TestCase):
         self.assertFalse(result.approved)
         self.assertEqual(result.required_changes, ("fix x",))
 
+    def test_malformed_json_metadata_fails_closed(self):
+        result = Reviewer.parse_review(
+            '{"approved":"false","feedback":"looks fine","required_changes":[],"confidence":[]}'
+        )
+
+        self.assertFalse(result.approved)
+        self.assertEqual(result.confidence, 0.0)
+        self.assertIn("approved must be a JSON boolean", result.feedback)
+        self.assertIn("confidence must be a finite JSON number", result.feedback)
+
 
 if __name__ == "__main__":
     unittest.main()

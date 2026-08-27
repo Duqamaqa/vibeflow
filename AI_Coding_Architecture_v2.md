@@ -64,7 +64,7 @@ Prompt skills are different: they are optional, reusable instruction documents s
 
 The CTO role is OpenAI/Codex, using ChatGPT subscription access when that account is connected in FCC. Workers should favor inexpensive OpenRouter or NVIDIA models when benchmarks show they are sufficient. Claude is not a dependency. Ollama/local inference is excluded from v1.
 
-The researched August 2026 mappings use DeepSeek V4 Flash 0731 for cheap work, DeepSeek V4 Pro 0813 for standard work, and live FCC discovery for the best available OpenAI/Codex strong model. Published benchmark/provider data selects candidates; local verification and fresh review remain the acceptance gates. The 60/30/10 concept is a target philosophy, never a hard quota.
+The researched August 2026 mappings use DeepSeek V4 Flash 0731 through OpenRouter for cheap work, DeepSeek V4 Pro 0813 for standard work, and live FCC discovery for the best available OpenAI/Codex strong model. NVIDIA NIM remains a cheap-tier fallback. Published benchmark/provider data selects candidates; local verification and fresh review remain the acceptance gates. The 60/30/10 concept is a target philosophy, never a hard quota.
 
 ## Safety invariants
 

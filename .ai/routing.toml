@@ -1,5 +1,5 @@
 [tiers.cheap]
-model = "nvidia_nim/deepseek-ai/deepseek-v4-flash-0731"
+model = "open_router/deepseek/deepseek-v4-flash-0731"
 
 [tiers.standard]
 model = "open_router/deepseek/deepseek-v4-pro-0813"
@@ -13,7 +13,7 @@ target_philosophy = "60/30/10"
 
 [candidates]
 cheap = [
-  "open_router/deepseek/deepseek-v4-flash-0731",
+  "nvidia_nim/deepseek-ai/deepseek-v4-flash-0731",
 ]
 standard = [
   "open_router/z-ai/glm-5.2",

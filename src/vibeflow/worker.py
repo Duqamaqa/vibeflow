@@ -74,7 +74,8 @@ class Worker:
         return (
             "You are an isolated implementation agent. Produce a structured file-change proposal; "
             "do not run commands, commit, deploy, or expose secrets. Return JSON only with keys: "
-            "success, summary, operations, uncertainty. Each operation is one of: "
+            "success, summary, operations, uncertainty. success must be a JSON boolean and "
+            "uncertainty must be a JSON number from 0.0 to 1.0, never a list. Each operation is one of: "
             '{"op":"create","path":"relative/path","content":"full UTF-8 contents"}, '
             '{"op":"update","path":"relative/path","content":"full UTF-8 contents",'
             '"expected_sha256":"64 lowercase hex characters"}, '
@@ -96,13 +97,15 @@ class Worker:
         try:
             payload = json.loads(raw)
         except json.JSONDecodeError:
-            return WorkerResult(
-                success=False,
-                summary="Agent returned an invalid non-JSON proposal",
-                usage=usage,
-                request_id=request_id,
-                raw_output=raw,
-            )
+            payload = _extract_json_payload(raw)
+            if payload is None:
+                return WorkerResult(
+                    success=False,
+                    summary="Agent returned an invalid non-JSON proposal",
+                    usage=usage,
+                    request_id=request_id,
+                    raw_output=raw,
+                )
         if not isinstance(payload, dict):
             return WorkerResult(
                 success=False,
@@ -145,9 +148,26 @@ class Worker:
 
 
 def _parse_uncertainty(value: Any) -> tuple[float, str | None]:
+    if value == []:
+        return 0.0, None
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return 0.0, "uncertainty must be a JSON number between 0 and 1"
     uncertainty = float(value)
     if not math.isfinite(uncertainty) or not 0.0 <= uncertainty <= 1.0:
         return 0.0, "uncertainty must be a finite number between 0 and 1"
     return uncertainty, None
+
+
+def _extract_json_payload(raw: str) -> dict[str, Any] | None:
+    decoder = json.JSONDecoder()
+    candidates: list[dict[str, Any]] = []
+    for index, character in enumerate(raw):
+        if character != "{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(raw[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict) and {"success", "operations"}.issubset(value):
+            candidates.append(value)
+    return candidates[0] if len(candidates) == 1 else None

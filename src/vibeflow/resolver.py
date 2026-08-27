@@ -11,7 +11,7 @@ from .budget import BudgetExceeded, BudgetLedger
 from .changes import ChangeError, StructuredChangeApplier
 from .context import ContextBundle, ContextManager
 from .contracts import Contract
-from .fcc_client import FCCClient
+from .fcc_client import FCCClient, FCCError
 from .reviewer import Reviewer, ReviewResult
 from .router import Router, RoutingDecision
 from .verifier import AcceptancePolicy, Verifier
@@ -131,12 +131,17 @@ class Resolver:
                     return self._budget_blocked(
                         iteration, current, tiers, feedback, last_worker, last_review, verification, exc
                     )
-            last_worker = self.worker.execute(
-                contract,
-                current.model,
-                context,
-                feedback=feedback,
-            )
+            try:
+                last_worker = self.worker.execute(
+                    contract,
+                    current.model,
+                    context,
+                    feedback=feedback,
+                )
+            except FCCError as exc:
+                feedback.append(f"Model provider failed safely: {exc}")
+                current = self.router.escalate(current, "model provider failure")
+                continue
             if self.budget_ledger is not None:
                 try:
                     self.budget_ledger.record(current.model, last_worker.usage)
@@ -181,13 +186,18 @@ class Resolver:
                     return self._budget_blocked(
                         iteration, current, tiers, feedback, last_worker, last_review, verification, exc
                     )
-            last_review = self.reviewer_factory().review(
-                contract,
-                context,
-                last_worker.diff,
-                verification,
-                self.review_model or current.model,
-            )
+            try:
+                last_review = self.reviewer_factory().review(
+                    contract,
+                    context,
+                    last_worker.diff,
+                    verification,
+                    self.review_model or current.model,
+                )
+            except FCCError as exc:
+                feedback.append(f"Reviewer provider failed safely: {exc}")
+                current = self.router.escalate(current, "reviewer provider failure")
+                continue
             if self.budget_ledger is not None:
                 try:
                     self.budget_ledger.record(self.review_model or current.model, last_review.usage)
