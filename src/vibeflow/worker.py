@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
+import math
 from typing import Any, Iterable
 
 from .changes import ChangeError, ChangeProposal
@@ -112,22 +113,41 @@ class Worker:
             )
         proposal = None
         parse_error = None
-        if payload.get("success", True):
+        success_claim = payload.get("success", True)
+        if not isinstance(success_claim, bool):
+            parse_error = "success must be a JSON boolean"
+            success_claim = False
+        uncertainty, uncertainty_error = _parse_uncertainty(
+            payload.get("uncertainty", 0.0)
+        )
+        if parse_error is None and uncertainty_error is not None:
+            parse_error = uncertainty_error
+        if success_claim:
             try:
                 proposal = ChangeProposal.from_payload(payload.get("operations"))
             except ChangeError as exc:
-                parse_error = str(exc)
+                if parse_error is None:
+                    parse_error = str(exc)
         return WorkerResult(
-            success=bool(payload.get("success", True)) and proposal is not None,
+            success=success_claim and proposal is not None and parse_error is None,
             summary=(
                 f"Invalid structured proposal: {parse_error}"
                 if parse_error
                 else str(payload.get("summary", ""))
             ),
             changed_files=() if proposal is None else proposal.changed_files,
-            uncertainty=max(0.0, min(1.0, float(payload.get("uncertainty", 0.0)))),
+            uncertainty=uncertainty,
             usage=usage,
             request_id=request_id,
             raw_output=raw,
             proposal=proposal,
         )
+
+
+def _parse_uncertainty(value: Any) -> tuple[float, str | None]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0.0, "uncertainty must be a JSON number between 0 and 1"
+    uncertainty = float(value)
+    if not math.isfinite(uncertainty) or not 0.0 <= uncertainty <= 1.0:
+        return 0.0, "uncertainty must be a finite number between 0 and 1"
+    return uncertainty, None

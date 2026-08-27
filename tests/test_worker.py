@@ -42,6 +42,28 @@ class TestWorkerStructuredOutput(unittest.TestCase):
         self.assertIsNone(result.proposal)
         self.assertEqual(result.diff, "")
 
+    def test_list_uncertainty_fails_closed_without_raising(self):
+        payload = {
+            "success": True,
+            "summary": "updated file",
+            "operations": [{
+                "op": "create",
+                "path": "README.md",
+                "content": "Description\n",
+            }],
+            "uncertainty": [0.1],
+        }
+
+        result = Worker._parse_response(
+            json.dumps(payload),
+            usage={},
+            request_id="request-list",
+        )
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.uncertainty, 0.0)
+        self.assertIn("uncertainty must be a JSON number", result.summary)
+
 
 if __name__ == "__main__":
     unittest.main()

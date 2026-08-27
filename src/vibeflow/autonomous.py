@@ -11,7 +11,7 @@ from .context import ContextManager
 from .contracts import Ambiguity, Risk
 from .fcc_client import FCCClient
 from .model_selection import resolve_tier_models
-from .orchestrator import Orchestrator, TaskResult, TaskStatus
+from .orchestrator import Orchestrator, TaskPlan, TaskResult, TaskStatus
 from .resolver import ResolutionStatus, Resolver, ResolverResult
 from .router import Router
 from .verifier import Verifier
@@ -70,25 +70,32 @@ class AutonomousRunner:
 
         try:
             with IsolatedWorkspace(self.repo_root) as workspace:
-                workspace_context_manager = ContextManager(workspace.path)
-                context = workspace_context_manager.build_context(
-                    plan.contract,
-                    context_files,
-                )
-                plan = replace(plan, context=context)
-                plan = orchestrator.prepare_skills(plan)
-                plan = orchestrator.prepare_strategy(plan)
-                resolver = Resolver(
-                    self.fcc_client,
-                    workspace_context_manager,
-                    worker=Worker(self.fcc_client, workspace_context_manager),
-                    verifier=Verifier(workspace.path),
-                    router=router,
-                    max_iterations=self.max_iterations,
-                    change_applier=workspace.applier,
-                    review_model=resolved_models["strong"],
-                )
-                resolution = resolver.resolve(plan.contract, plan.routing, plan.context)
+                try:
+                    workspace_context_manager = ContextManager(workspace.path)
+                    context = workspace_context_manager.build_context(
+                        plan.contract,
+                        context_files,
+                    )
+                    plan = replace(plan, context=context)
+                    plan = orchestrator.prepare_skills(plan)
+                    plan = orchestrator.prepare_strategy(plan)
+                    resolver = Resolver(
+                        self.fcc_client,
+                        workspace_context_manager,
+                        worker=Worker(self.fcc_client, workspace_context_manager),
+                        verifier=Verifier(workspace.path),
+                        router=router,
+                        max_iterations=self.max_iterations,
+                        change_applier=workspace.applier,
+                        review_model=resolved_models["strong"],
+                    )
+                    resolution = resolver.resolve(plan.contract, plan.routing, plan.context)
+                except (RuntimeError, TypeError, ValueError) as exc:
+                    return self._blocked_result(
+                        plan,
+                        started,
+                        f"Worker pipeline failed safely: {exc}",
+                    )
                 if not resolution.success:
                     return TaskResult(
                         TaskStatus.BLOCKED,
@@ -97,7 +104,14 @@ class AutonomousRunner:
                         resolution=resolution,
                         blocker=resolution.blocker,
                     )
-                promoted = workspace.promote()
+                try:
+                    promoted = workspace.promote()
+                except (OSError, RuntimeError, TypeError, ValueError, WorkspaceError) as exc:
+                    return self._blocked_result(
+                        plan,
+                        started,
+                        f"Safe promotion failed: {exc}",
+                    )
                 worker = replace(
                     resolution.worker,
                     diff=promoted.diff,
@@ -105,25 +119,37 @@ class AutonomousRunner:
                     applied=True,
                 )
                 resolution = replace(resolution, worker=worker)
-        except (OSError, RuntimeError, TypeError, ValueError, WorkspaceError) as exc:
-            blocked = ResolverResult(
-                ResolutionStatus.BLOCKED,
-                0,
-                plan.routing,
-                blocker=f"Safe workspace or promotion failed: {exc}",
-            )
-            return TaskResult(
-                TaskStatus.BLOCKED,
+        except (OSError, WorkspaceError) as exc:
+            return self._blocked_result(
                 plan,
-                time.monotonic() - started,
-                resolution=blocked,
-                blocker=blocked.blocker,
+                started,
+                f"Safe workspace failed: {exc}",
             )
         return TaskResult(
             TaskStatus.DONE,
             plan,
             time.monotonic() - started,
             resolution=resolution,
+        )
+
+    @staticmethod
+    def _blocked_result(
+        plan: TaskPlan,
+        started: float,
+        blocker: str,
+    ) -> TaskResult:
+        blocked = ResolverResult(
+            ResolutionStatus.BLOCKED,
+            0,
+            plan.routing,
+            blocker=blocker,
+        )
+        return TaskResult(
+            TaskStatus.BLOCKED,
+            plan,
+            time.monotonic() - started,
+            resolution=blocked,
+            blocker=blocker,
         )
 
 

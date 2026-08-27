@@ -47,7 +47,46 @@ class CapturingResolver:
         )
 
 
+class ExplodingResolver:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def resolve(self, contract, routing, context):
+        raise TypeError("malformed worker metadata")
+
+
 class TestAutonomousSkills(unittest.TestCase):
+    def test_worker_exception_is_not_reported_as_workspace_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / ".ai").mkdir()
+            (root / ".ai" / "routing.toml").write_text(
+                """[tiers.cheap]
+model = "provider/cheap"
+[tiers.standard]
+model = "provider/standard"
+[tiers.strong]
+model = "provider/strong"
+""",
+                encoding="utf-8",
+            )
+            models = {
+                "cheap": "provider/cheap",
+                "standard": "provider/standard",
+                "strong": "provider/strong",
+            }
+
+            with (
+                patch("src.vibeflow.autonomous.resolve_tier_models", return_value=models),
+                patch("src.vibeflow.autonomous.IsolatedWorkspace", FakeWorkspace),
+                patch("src.vibeflow.autonomous.Resolver", ExplodingResolver),
+            ):
+                result = AutonomousRunner(root, fcc_client=FakeFCC()).run("Create a file")
+
+            self.assertFalse(result.success)
+            self.assertIn("Worker pipeline failed safely", result.blocker)
+            self.assertNotIn("workspace", result.blocker.lower())
+
     def test_multi_agent_strategy_is_inferred_from_natural_language(self):
         options = _infer_plan_options(
             "Compare approaches and rethink architecture with parallel agents"
