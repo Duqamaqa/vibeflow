@@ -231,7 +231,11 @@ class TestDoctorAndModelsCommands(CLITestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(output["source"], "live")
-        self.assertEqual(output["models"]["models"][0]["slug"], "model/cheap")
+        self.assertEqual(
+            output["models"],
+            ["model/cheap", "model/standard", "model/strong"],
+        )
+        self.assertEqual(output["catalog_count"], 3)
         self.assertEqual(output["resolved_tiers"]["strong"], "model/strong")
         live_lister.assert_called_once_with()
         self.assertIsNone(error)

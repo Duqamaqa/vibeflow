@@ -4,11 +4,13 @@
 
 `cheap`, `standard`, and `strong` are stable policy names. FCC model slugs are configuration, not architecture. As of August 27, 2026, the project uses internet-researched mappings rather than requiring the user to run a paid benchmark:
 
-- cheap: `openrouter/deepseek/deepseek-v4-flash-0731`;
-- standard: `openrouter/deepseek/deepseek-v4-pro-0813`;
+- cheap: `nvidia_nim/deepseek-ai/deepseek-v4-flash-0731`;
+- standard: `open_router/deepseek/deepseek-v4-pro-0813`;
 - strong: `auto:openai-codex`, resolved from the live FCC catalog.
 
-The standard alternatives are OpenRouter GLM 5.2 and NVIDIA NIM DeepSeek V4 Pro 0813. Anthropic/Claude is excluded.
+The cheap alternative is OpenRouter DeepSeek V4 Flash 0731. The standard alternatives are OpenRouter GLM 5.2 and Kimi K3. Anthropic/Claude inference models are excluded.
+
+FCC's current catalog exposes provider models behind an `anthropic/` transport namespace because the gateway presents an Anthropic-compatible adapter. That leading namespace is not the inference vendor: the next segment is `nvidia_nim`, `open_router`, or `openai`. Vibeflow accepts that transport wrapper but rejects every catalog ID containing `claude` or the `~anthropic` model alias. It prefers direct connected-account OpenAI routes over OpenRouter for the strong tier.
 
 The deterministic base score considers task type, complexity, risk, scope, uncertainty, verification criticality, and previous failures. Layer 1 may override a tier explicitly. A failure or material uncertainty moves up one tier, capped at two escalations.
 
@@ -33,6 +35,6 @@ Current sources:
 - [Artificial Analysis coding-agent methodology](https://artificialanalysis.ai/agents/coding-agents/)
 - [DeepSWE benchmark paper](https://arxiv.org/abs/2607.07946)
 - [SWE-Bench Pro paper](https://arxiv.org/abs/2509.16941)
-- [NVIDIA NIM DeepSeek V4 Pro 0813](https://build.nvidia.com/deepseek-ai/deepseek-v4-pro-0813)
+- [NVIDIA NIM model catalog](https://build.nvidia.com/models)
 
 The benchmark command remains available for future audits, but normal use does not require it.

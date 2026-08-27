@@ -107,24 +107,55 @@ def resolve_tier_models(
 
 
 def _catalog_match(choice: str, available: Sequence[str]) -> str | None:
-    if choice in available:
+    if _is_claude_model_id(choice):
+        return None
+    if choice in available and not _is_claude_model_id(choice):
         return choice
     normalized = choice.lower().strip("/")
     suffix_matches = [
         item for item in available
         if item.lower().strip("/").endswith(normalized)
+        and not _is_claude_model_id(item)
     ]
-    return suffix_matches[0] if len(suffix_matches) == 1 else None
+    if not suffix_matches:
+        return None
+    return sorted(suffix_matches, key=_transport_rank)[0]
 
 
 def _rank_openai_codex(available: Sequence[str]) -> str | None:
     openai_models = [
         model for model in available
-        if "openai" in model.lower() and "anthropic" not in model.lower()
+        if _is_openai_model_id(model) and not _is_claude_model_id(model)
     ]
     for preference in STRONG_OPENAI_PREFERENCES:
         matches = [model for model in openai_models if preference in model.lower()]
         if matches:
-            return sorted(matches, key=lambda item: (len(item), item))[0]
+            return sorted(matches, key=_openai_rank)[0]
     codex_models = [model for model in openai_models if "codex" in model.lower()]
-    return sorted(codex_models)[-1] if codex_models else None
+    return sorted(codex_models, key=_openai_rank)[0] if codex_models else None
+
+
+def _is_claude_model_id(model: str) -> bool:
+    normalized = model.lower().strip("/")
+    return "claude" in normalized or "/~anthropic/" in f"/{normalized}/"
+
+
+def _is_openai_model_id(model: str) -> bool:
+    normalized = model.lower().strip("/")
+    return normalized.startswith("openai/") or "/openai/" in f"/{normalized}/"
+
+
+def _transport_rank(model: str) -> tuple[int, int, str]:
+    normalized = model.lower().strip("/")
+    wrapper_rank = 1 if normalized.startswith("anthropic/") else 0
+    return wrapper_rank, len(normalized), normalized
+
+
+def _openai_rank(model: str) -> tuple[int, int, str]:
+    normalized = model.lower().strip("/")
+    direct_provider = (
+        normalized.startswith("openai/")
+        or normalized.startswith("anthropic/openai/")
+    )
+    provider_rank = 0 if direct_provider else 1
+    return provider_rank, *_transport_rank(normalized)[1:]

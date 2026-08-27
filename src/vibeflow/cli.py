@@ -49,13 +49,13 @@ INIT_MEMORY_FILES = {
     ".ai/decisions.md": "# Decisions\n\nRecord durable architecture decisions here.\n",
     ".ai/coding_rules.md": "# Coding rules\n\n- Preserve unrelated changes.\n- Require deterministic verification.\n",
     ".ai/routing.toml": (
-        "[tiers.cheap]\nmodel = \"openrouter/deepseek/deepseek-v4-flash-0731\"\n\n"
-        "[tiers.standard]\nmodel = \"openrouter/deepseek/deepseek-v4-pro-0813\"\n\n"
+        "[tiers.cheap]\nmodel = \"nvidia_nim/deepseek-ai/deepseek-v4-flash-0731\"\n\n"
+        "[tiers.standard]\nmodel = \"open_router/deepseek/deepseek-v4-pro-0813\"\n\n"
         "[tiers.strong]\nmodel = \"auto:openai-codex\"\n\n"
         "[policy]\nmax_escalations = 2\n\n"
         "[candidates]\n"
-        "cheap = [\"openrouter/deepseek/deepseek-v4-flash\"]\n"
-        "standard = [\"openrouter/z-ai/glm-5.2\", \"nvidia_nim/deepseek-ai/deepseek-v4-pro-0813\"]\n"
+        "cheap = [\"open_router/deepseek/deepseek-v4-flash-0731\"]\n"
+        "standard = [\"open_router/z-ai/glm-5.2\", \"open_router/moonshotai/kimi-k3\"]\n"
         "strong = []\n"
     ),
 }
@@ -602,13 +602,14 @@ def _handle_models(
     repo_root = _repo_root(args)
     configured = _local_model_mappings(repo_root)
     alternatives = _local_model_candidates(repo_root)
-    live_models = None
+    catalog_count = None
     resolved = None
     if args.live:
         if dependencies.live_model_lister is None:
             raise RuntimeError("Live model listing is not configured")
-        live_models = dependencies.live_model_lister()
-        resolved = resolve_tier_models(repo_root / ".ai" / "routing.toml", live_models)
+        live_payload = dependencies.live_model_lister()
+        catalog_count = len(extract_model_ids(live_payload))
+        resolved = resolve_tier_models(repo_root / ".ai" / "routing.toml", live_payload)
     return 0, {
         "ok": True,
         "command": "models",
@@ -616,7 +617,12 @@ def _handle_models(
         "tier_mappings": configured,
         "configured_alternatives": alternatives,
         "resolved_tiers": resolved,
-        "models": live_models if args.live else list(dict.fromkeys(configured.values())),
+        "catalog_count": catalog_count,
+        "models": (
+            list(dict.fromkeys(resolved.values()))
+            if resolved is not None
+            else list(dict.fromkeys(configured.values()))
+        ),
     }
 
 
