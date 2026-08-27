@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, Callable
 
 from .budget import BudgetExceeded, BudgetLedger
@@ -13,7 +14,7 @@ from .contracts import Contract
 from .fcc_client import FCCClient
 from .reviewer import Reviewer, ReviewResult
 from .router import Router, RoutingDecision
-from .verifier import Verifier
+from .verifier import AcceptancePolicy, Verifier
 from .worker import Worker, WorkerResult
 
 
@@ -170,7 +171,8 @@ class Resolver:
                     applied=applied.applied,
                 )
 
-            verification = self.verifier.verify()
+            policy = self._verification_policy(contract, last_worker)
+            verification = self.verifier.verify(policy) if policy is not None else self.verifier.verify()
             green = self._verification_green(verification)
             if self.budget_ledger is not None:
                 try:
@@ -287,6 +289,30 @@ class Resolver:
                     values.append(result)
             return bool(values) and all(values)
         return False
+
+    @staticmethod
+    def _verification_policy(
+        contract: Contract,
+        worker: WorkerResult,
+    ) -> AcceptancePolicy | None:
+        if contract.task_type != "docs" or not worker.changed_files:
+            return None
+        documentation_names = {
+            "changelog",
+            "contributing",
+            "license",
+            "readme",
+            "security",
+        }
+        documentation_suffixes = {".md", ".mdx", ".rst", ".txt"}
+        for changed_file in worker.changed_files:
+            path = Path(changed_file)
+            if path.suffix.lower() in documentation_suffixes:
+                continue
+            if path.name.lower().split(".", 1)[0] in documentation_names:
+                continue
+            return None
+        return AcceptancePolicy(required_categories=())
 
     def _rollback(self) -> None:
         if self.change_applier is not None:

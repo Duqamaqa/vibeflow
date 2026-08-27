@@ -189,7 +189,18 @@ def _infer_plan_options(goal: str) -> dict[str, object]:
     risk = Risk.HIGH if any(term in normalized for term in high_risk_terms) else Risk.LOW
     if any(term in normalized for term in ("architecture", "security", "migration")):
         task_type = "architecture" if "architecture" in normalized else "security"
-    elif any(term in normalized for term in ("document", "readme", "docs")):
+    elif any(
+        term in normalized
+        for term in (
+            "document",
+            "readme",
+            "docs",
+            "write a description",
+            "write the description",
+            "describe the folder",
+            "description of the folder",
+        )
+    ):
         task_type = "docs"
     elif any(term in normalized for term in ("bug", "fix", "error", "failure")):
         task_type = "bugfix"

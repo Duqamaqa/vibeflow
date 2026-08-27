@@ -56,6 +56,11 @@ class ExplodingResolver:
 
 
 class TestAutonomousSkills(unittest.TestCase):
+    def test_folder_description_is_classified_as_documentation(self):
+        options = _infer_plan_options("Write a description of the folder for visitors")
+
+        self.assertEqual(options["task_type"], "docs")
+
     def test_worker_exception_is_not_reported_as_workspace_failure(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

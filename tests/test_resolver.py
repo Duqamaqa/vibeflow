@@ -12,6 +12,7 @@ from vibeflow.resolver import ResolutionStatus, Resolver
 from vibeflow.reviewer import ReviewResult
 from vibeflow.router import Router, Tier
 from vibeflow.worker import WorkerResult
+from vibeflow.verifier import CheckStatus, Verifier
 
 
 class FakeWorker:
@@ -148,6 +149,66 @@ class TestResolver(unittest.TestCase):
 
             self.assertFalse(result.success)
             self.assertEqual(path.read_text(encoding="utf-8"), "old\n")
+
+    def test_docs_only_change_can_pass_without_repository_tests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proposal = ChangeProposal((FileOperation(
+                "create",
+                "README.md",
+                content="# Project\n",
+            ),))
+            contract = Contract(
+                "Describe the folder",
+                acceptance_criteria=["README explains the folder"],
+                task_type="docs",
+            )
+            resolver = Resolver(
+                worker=FakeWorker([WorkerResult(True, "docs", proposal=proposal)]),
+                reviewer_factory=ReviewerFactory([ReviewResult(True, "approved", (), 1.0)]),
+                verifier=Verifier(root),
+                router=self.router,
+                max_iterations=1,
+                change_applier=StructuredChangeApplier(root),
+            )
+
+            result = resolver.resolve(contract, self.base, self.context)
+
+            self.assertTrue(result.success)
+            self.assertEqual(
+                result.verification.by_category("tests")[0].status,
+                CheckStatus.SKIPPED,
+            )
+
+    def test_docs_task_that_changes_code_still_requires_tests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proposal = ChangeProposal((FileOperation(
+                "create",
+                "app.py",
+                content="print('hello')\n",
+            ),))
+            contract = Contract(
+                "Document and adjust the app",
+                acceptance_criteria=["change is verified"],
+                task_type="docs",
+            )
+            resolver = Resolver(
+                worker=FakeWorker([WorkerResult(True, "code", proposal=proposal)]),
+                reviewer_factory=ReviewerFactory([ReviewResult(True, "approved", (), 1.0)]),
+                verifier=Verifier(root),
+                router=self.router,
+                max_iterations=1,
+                change_applier=StructuredChangeApplier(root),
+            )
+
+            result = resolver.resolve(contract, self.base, self.context)
+
+            self.assertFalse(result.success)
+            self.assertIn(
+                "required tests check was not discovered",
+                result.verification.decision.reasons,
+            )
 
     def test_resolver_patch_reapplies_verifies_and_rereviews(self):
         with tempfile.TemporaryDirectory() as directory:
