@@ -129,6 +129,24 @@ class AutonomousRunner:
 
 def _infer_plan_options(goal: str) -> dict[str, object]:
     normalized = goal.lower()
+    explicit_multi_agent = any(
+        term in normalized
+        for term in ("parallel agents", "multi-agent", "multi agent", "consensus", "agent debate")
+    )
+    uncertainty_signal = explicit_multi_agent or any(
+        term in normalized
+        for term in (
+            "not sure",
+            "uncertain",
+            "compare approaches",
+            "compare options",
+            "explore options",
+            "choose an approach",
+            "unknown cause",
+            "rethink architecture",
+            "redesign architecture",
+        )
+    )
     high_risk_terms = (
         "production",
         "deploy",
@@ -140,6 +158,7 @@ def _infer_plan_options(goal: str) -> dict[str, object]:
         "delete data",
         "rotate key",
         "credential",
+        "agent debate",
     )
     risk = Risk.HIGH if any(term in normalized for term in high_risk_terms) else Risk.LOW
     if any(term in normalized for term in ("architecture", "security", "migration")):
@@ -151,11 +170,14 @@ def _infer_plan_options(goal: str) -> dict[str, object]:
     else:
         task_type = "implementation"
     expected_scope = "large" if any(term in normalized for term in ("entire repo", "whole repo", "large refactor")) else "small"
-    complexity = 8 if expected_scope == "large" else 4
+    critical_task = task_type in {"architecture", "security"}
+    complexity = 8 if expected_scope == "large" or critical_task or explicit_multi_agent else 4
+    high_uncertainty = uncertainty_signal and complexity >= 7
     return {
         "risk": risk,
-        "ambiguity": Ambiguity.LOW,
+        "ambiguity": Ambiguity.HIGH if high_uncertainty else Ambiguity.LOW,
         "task_type": task_type,
         "expected_scope": expected_scope,
         "complexity": complexity,
+        "uncertainty": 8 if high_uncertainty else 0,
     }

@@ -127,6 +127,8 @@ Vibeflow never automatically commits, pushes, merges, publishes, deploys, or edi
 
 The dashboard separates **built-in Vibeflow engines** from **optional prompt skills**. This matters because Context Iceberg, isolated agent rooms, model routing, structured changes, verification, fresh review, bounded resolution, and safe apply are part of Vibeflow itself. You do not import or check them; safety engines are always on, while parallel consensus and agent debate activate automatically for qualifying difficult tasks.
 
+To explicitly request a multi-agent strategy, say `use parallel agents` or `use agent debate` in the prompt. Vibeflow treats those as high-uncertainty work; debate is high-risk and therefore requires approval. Otherwise the semantic router turns these modes on only when the task language signals both difficulty and uncertainty.
+
 You do not need optional skills to use Vibeflow. A beginner can choose a repository, write the desired outcome, and use the default safe route. Prompt skills become useful when you want Vibeflow to follow a repeatable personal or team standard.
 
 In the dashboard's **Skills** section you can:

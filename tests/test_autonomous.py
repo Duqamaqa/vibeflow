@@ -3,9 +3,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.vibeflow.autonomous import AutonomousRunner
+from src.vibeflow.autonomous import AutonomousRunner, _infer_plan_options
 from src.vibeflow.changes import ApplyResult
 from src.vibeflow.resolver import ResolutionStatus, ResolverResult
+from src.vibeflow.router import Router
 from src.vibeflow.skills import RepositorySkillStore
 from src.vibeflow.worker import WorkerResult
 
@@ -47,6 +48,34 @@ class CapturingResolver:
 
 
 class TestAutonomousSkills(unittest.TestCase):
+    def test_multi_agent_strategy_is_inferred_from_natural_language(self):
+        options = _infer_plan_options(
+            "Compare approaches and rethink architecture with parallel agents"
+        )
+        routing = Router("missing.toml").route(
+            task_type=options["task_type"],
+            complexity=options["complexity"],
+            risk=options["risk"].value,
+            expected_scope=options["expected_scope"],
+            uncertainty=options["uncertainty"],
+        )
+
+        self.assertEqual(options["ambiguity"].value, "high")
+        self.assertEqual(routing.strategy, "consensus")
+
+    def test_agent_debate_request_is_high_risk_and_requires_debate(self):
+        options = _infer_plan_options("Use agent debate for this security architecture")
+        routing = Router("missing.toml").route(
+            task_type=options["task_type"],
+            complexity=options["complexity"],
+            risk=options["risk"].value,
+            expected_scope=options["expected_scope"],
+            uncertainty=options["uncertainty"],
+        )
+
+        self.assertEqual(options["risk"].value, "high")
+        self.assertEqual(routing.strategy, "debate")
+
     def test_selected_skill_reaches_autonomous_resolver_context(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
