@@ -113,9 +113,26 @@
         <section class="skills-panel" id="skills" aria-labelledby="skills-title">
           <div class="panel-heading skills-heading">
             <div>
-              <p class="eyebrow accent">REUSABLE EXPERTISE</p>
-              <h2 id="skills-title">Bring your own way of working.</h2>
-              <p class="skills-intro">Skills are reusable instructions for design systems, review standards, frameworks, workflows, and team conventions. Select any skill to use it on the next task.</p>
+              <p class="eyebrow accent">BUILT-IN INTELLIGENCE + YOUR EXPERTISE</p>
+              <h2 id="skills-title">Know what Vibeflow uses.</h2>
+              <p class="skills-intro">Vibeflow engines protect and coordinate every task. Prompt skills are optional instructions you check for the next request.</p>
+            </div>
+          </div>
+          <div class="skill-section-heading">
+            <div>
+              <span class="skill-section-kicker">VIBEFLOW ENGINES</span>
+              <h3>Built in—nothing to import.</h3>
+              <p>Safety engines stay on. Expensive multi-agent engines activate only when routing says they are useful.</p>
+            </div>
+            <span class="engine-legend"><b>ON</b> always · <b>AUTO</b> when needed</span>
+          </div>
+          <div id="engine-list" class="engine-list" aria-live="polite"></div>
+
+          <div class="skill-section-heading prompt-skill-heading">
+            <div>
+              <span class="skill-section-kicker">PROMPT SKILLS</span>
+              <h3>Select instructions for your next task.</h3>
+              <p>Check a card and Vibeflow adds its full instructions to the task context. It does not clutter or rewrite your visible prompt.</p>
             </div>
             <div class="skill-actions">
               <button id="import-skill" class="secondary-button" type="button">Import skill folder</button>
@@ -124,13 +141,13 @@
           </div>
           <div class="skill-toolbar">
             <span id="skill-count">0 skills available</span>
-            <span id="selected-skill-count">0 selected</span>
+            <span id="selected-skill-count">0 selected for next prompt</span>
           </div>
           <div id="skill-errors" class="inline-alert" hidden></div>
           <div id="skill-list" class="skill-list" aria-live="polite"></div>
           <div id="empty-skills" class="empty-skills">
-            <strong>No skills yet.</strong>
-            <span>Create one in plain language or import a folder containing <code>SKILL.md</code>.</span>
+            <strong>No optional prompt skills yet.</strong>
+            <span>The built-in engines above already work. Create a personal skill or import a folder containing <code>SKILL.md</code>.</span>
           </div>
         </section>
 

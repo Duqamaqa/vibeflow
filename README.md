@@ -125,13 +125,15 @@ Vibeflow never automatically commits, pushes, merges, publishes, deploys, or edi
 
 ## Skills: from beginner to professional
 
-You do not need skills to use Vibeflow. A beginner can choose a repository, write the desired outcome, and use the default safe route. Skills become useful when you want Vibeflow to follow a repeatable personal or team standard.
+The dashboard separates **built-in Vibeflow engines** from **optional prompt skills**. This matters because Context Iceberg, isolated agent rooms, model routing, structured changes, verification, fresh review, bounded resolution, and safe apply are part of Vibeflow itself. You do not import or check them; safety engines are always on, while parallel consensus and agent debate activate automatically for qualifying difficult tasks.
+
+You do not need optional skills to use Vibeflow. A beginner can choose a repository, write the desired outcome, and use the default safe route. Prompt skills become useful when you want Vibeflow to follow a repeatable personal or team standard.
 
 In the dashboard's **Skills** section you can:
 
 - **Create a skill** with a name, plain-language description, trigger phrases, risk level, and reusable instructions.
 - **Import skill folder** and choose an existing folder with the native folder chooser. The folder must contain `SKILL.md`.
-- Select one or more skills for the next plan or autonomous task.
+- Click or check one or more skill cards for the next plan or autonomous task. Vibeflow adds their full instructions to bounded model context without rewriting the visible prompt.
 - Remove a repository skill without affecting your original imported folder.
 
 Skills are stored per project under `.ai/skills/<skill-name>/SKILL.md`, so a professional team can review and commit them like other project instructions. Trigger phrases may select a skill automatically; explicitly checked skills are always included in that task's bounded context.

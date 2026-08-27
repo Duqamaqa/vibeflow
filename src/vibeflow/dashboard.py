@@ -34,6 +34,79 @@ MAX_PROMPT_CHARACTERS = 20_000
 MAX_SELECTED_SKILLS = 16
 _SAFE_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
+BUILTIN_ENGINES: tuple[dict[str, str], ...] = (
+    {
+        "id": "context-iceberg",
+        "name": "Context Iceberg",
+        "description": "Shows each agent only the contract, project memory, and files relevant to the task.",
+        "activation": "always-on",
+        "when": "Every task",
+    },
+    {
+        "id": "isolated-agent-room",
+        "name": "Isolated Agent Room",
+        "description": "Builds changes in a separate Git worktree or safe copy so current work stays protected.",
+        "activation": "always-on",
+        "when": "Every change task",
+    },
+    {
+        "id": "semantic-router",
+        "name": "Semantic Model Router",
+        "description": "Chooses cheap, standard, or strong models from task complexity, scope, risk, and failures.",
+        "activation": "always-on",
+        "when": "Before model work",
+    },
+    {
+        "id": "structured-change-gate",
+        "name": "Structured Change Gate",
+        "description": "Accepts validated file operations instead of arbitrary shell commands or prose patches.",
+        "activation": "always-on",
+        "when": "Every proposed change",
+    },
+    {
+        "id": "deterministic-verification",
+        "name": "Deterministic Verification",
+        "description": "Runs discovered tests, linting, type checks, and builds instead of trusting an AI opinion.",
+        "activation": "always-on",
+        "when": "After changes",
+    },
+    {
+        "id": "fresh-reviewer",
+        "name": "Fresh Independent Reviewer",
+        "description": "Reviews only the contract, relevant context, diff, and verification—not worker reasoning.",
+        "activation": "always-on",
+        "when": "Before safe apply",
+    },
+    {
+        "id": "resolver-loop",
+        "name": "Bounded Resolver Loop",
+        "description": "Repairs reviewer failures, then verifies and reviews again without retrying forever.",
+        "activation": "automatic",
+        "when": "When review fails",
+    },
+    {
+        "id": "parallel-consensus",
+        "name": "Parallel Agents / Consensus",
+        "description": "Asks independent agents to solve a difficult uncertain problem, then compares their answers.",
+        "activation": "automatic",
+        "when": "High complexity and uncertainty",
+    },
+    {
+        "id": "agent-debate",
+        "name": "Agent Debate",
+        "description": "Uses pragmatist, contrarian, edge-case, and security perspectives before a final judgment.",
+        "activation": "automatic",
+        "when": "High-risk uncertain decisions",
+    },
+    {
+        "id": "safe-apply",
+        "name": "Hash-Guarded Safe Apply",
+        "description": "Promotes only reviewed files whose original content still matches the expected hashes.",
+        "activation": "always-on",
+        "when": "After a passing review",
+    },
+)
+
 
 def _json_ready(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
@@ -171,6 +244,7 @@ class DashboardService:
                     "error": routing_error,
                 },
                 "setup_required": not (root / ".ai" / "routing.toml").is_file(),
+                "engines": BUILTIN_ENGINES,
                 "skills": skill_catalog.to_dict(),
                 "last_task": self._read_last_task(root),
                 "tasks": self.list_tasks(root),

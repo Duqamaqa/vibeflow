@@ -26,6 +26,7 @@ const elements = {
   systemDetail: document.querySelector("#system-detail"),
   gitBadge: document.querySelector("#git-badge"),
   modelCards: document.querySelector("#model-cards"),
+  engineList: document.querySelector("#engine-list"),
   skillList: document.querySelector("#skill-list"),
   emptySkills: document.querySelector("#empty-skills"),
   skillCount: document.querySelector("#skill-count"),
@@ -111,6 +112,7 @@ async function loadBootstrap(repo = "") {
     elements.footerRepo.textContent = payload.repo_name.toUpperCase();
     renderSystem(payload);
     renderModels(payload.routing);
+    renderEngines(payload.engines || []);
     renderSkills(payload.skills || { items: [], errors: [] });
     elements.setupRepo.hidden = !(payload.setup_required && payload.git && payload.git.is_repository);
     const liveTask = payload.tasks.find((task) => ["queued", "running"].includes(task.status));
@@ -184,13 +186,35 @@ function renderModels(routing) {
   }
 }
 
+function renderEngines(engines) {
+  elements.engineList.replaceChildren();
+  for (const engine of engines) {
+    const card = document.createElement("article");
+    card.className = `engine-card ${engine.activation || "always-on"}`;
+    const heading = document.createElement("div");
+    heading.className = "engine-card-heading";
+    const name = document.createElement("strong");
+    name.textContent = engine.name;
+    const status = document.createElement("span");
+    status.className = "engine-status";
+    status.textContent = engine.activation === "automatic" ? "AUTO" : "ON";
+    const description = document.createElement("p");
+    description.textContent = engine.description;
+    const timing = document.createElement("small");
+    timing.textContent = `Used: ${engine.when}`;
+    heading.append(name, status);
+    card.append(heading, description, timing);
+    elements.engineList.append(card);
+  }
+}
+
 function renderSkills(skillState) {
   const skills = Array.isArray(skillState.items) ? skillState.items : [];
   const available = new Set(skills.map((skill) => skill.name));
   state.selectedSkills = new Set([...state.selectedSkills].filter((name) => available.has(name)));
   elements.skillList.replaceChildren();
   elements.emptySkills.hidden = skills.length > 0;
-  elements.skillCount.textContent = `${skills.length} skill${skills.length === 1 ? "" : "s"} available`;
+  elements.skillCount.textContent = `${skills.length} prompt skill${skills.length === 1 ? "" : "s"} available`;
   updateSelectedSkillCount();
   const errors = Array.isArray(skillState.errors) ? skillState.errors : [];
   elements.skillErrors.hidden = errors.length === 0;
@@ -237,6 +261,10 @@ function renderSkills(skillState) {
       card.classList.toggle("selected", checkbox.checked);
       updateSelectedSkillCount();
     });
+    card.addEventListener("click", (event) => {
+      if (event.target.closest("button, label, input")) return;
+      checkbox.click();
+    });
     remove.addEventListener("click", () => removeSkill(skill.name));
     card.append(checkbox, label, remove);
     elements.skillList.append(card);
@@ -245,7 +273,7 @@ function renderSkills(skillState) {
 
 function updateSelectedSkillCount() {
   const count = state.selectedSkills.size;
-  elements.selectedSkillCount.textContent = `${count} selected`;
+  elements.selectedSkillCount.textContent = `${count} selected for next prompt`;
 }
 
 async function submitTask(action) {

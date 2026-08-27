@@ -68,6 +68,9 @@ class TestDashboardService(DashboardTestCase):
         self.assertEqual(payload["routing"]["tiers"]["cheap"], "provider/cheap")
         self.assertFalse(payload["safety"]["credentials_in_browser"])
         self.assertFalse(payload["safety"]["auto_push"])
+        engines = {engine["id"]: engine for engine in payload["engines"]}
+        self.assertEqual(engines["context-iceberg"]["activation"], "always-on")
+        self.assertEqual(engines["parallel-consensus"]["activation"], "automatic")
 
     def test_plan_runs_in_background_without_live_worker(self):
         service = DashboardService(
@@ -340,12 +343,15 @@ class TestDashboardAssets(unittest.TestCase):
         self.assertIn('label class="sr-only" for="prompt-input"', html)
         self.assertIn('id="browse-repo"', html)
         self.assertIn('id="skill-dialog"', html)
+        self.assertIn('id="engine-list"', html)
+        self.assertIn("Built in—nothing to import", html)
         self.assertIn("Import skill folder", html)
         self.assertIn("prefers-reduced-motion", css)
         self.assertIn("[hidden] { display: none !important; }", css)
         self.assertNotIn("https://", css)
         self.assertNotIn("localStorage", javascript)
         self.assertNotIn("sessionStorage", javascript)
+        self.assertIn('skills: [...state.selectedSkills]', javascript)
 
 
 if __name__ == "__main__":

@@ -39,6 +39,12 @@ Vibeflow owns task analysis, decomposition, context control, semantic routing, t
 11. On PASS, promote final file contents to the target with the original hashes as concurrency preconditions. On failure, roll back/tear down the isolated task state.
 12. Return `done` only after reviewed promotion succeeds. Otherwise return `blocked` or `needs-approval`.
 
+## Built-in engines versus prompt skills
+
+Context Iceberg, semantic routing, isolated agent rooms/worktrees, structured change validation, deterministic verification, fresh review, bounded resolution, and hash-guarded safe apply are built-in Vibeflow engines. Users do not import or select these safety mechanisms. Parallel consensus and agent debate are also built in, but the router activates them only for qualifying complex, uncertain, or high-risk decisions.
+
+Prompt skills are different: they are optional, reusable instruction documents stored under `.ai/skills/`. A user can click one or more skill cards for a task, and Vibeflow adds those instructions to bounded model context without rewriting the visible prompt. This keeps the beginner path automatic while giving professional users explicit control over team standards and specialist workflows.
+
 ## Core modules
 
 - `contracts.py`: contract validation, approval policy, reverse prompting.

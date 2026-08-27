@@ -77,6 +77,7 @@ class AutonomousRunner:
                 )
                 plan = replace(plan, context=context)
                 plan = orchestrator.prepare_skills(plan)
+                plan = orchestrator.prepare_strategy(plan)
                 resolver = Resolver(
                     self.fcc_client,
                     workspace_context_manager,
@@ -87,7 +88,7 @@ class AutonomousRunner:
                     change_applier=workspace.applier,
                     review_model=resolved_models["strong"],
                 )
-                resolution = resolver.resolve(plan.contract, plan.routing, context)
+                resolution = resolver.resolve(plan.contract, plan.routing, plan.context)
                 if not resolution.success:
                     return TaskResult(
                         TaskStatus.BLOCKED,

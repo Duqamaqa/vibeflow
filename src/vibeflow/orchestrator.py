@@ -231,7 +231,7 @@ class Orchestrator:
         self._save_running(plan)
         try:
             plan = self.prepare_skills(plan)
-            plan = self._prepare_strategy(plan)
+            plan = self.prepare_strategy(plan)
             resolver = self._resolver(plan)
             resolution = resolver.resolve(plan.contract, plan.routing, plan.context)
         except (KeyError, OSError, RuntimeError, TypeError, ValueError) as exc:
@@ -272,7 +272,7 @@ class Orchestrator:
             ),
         )
 
-    def _prepare_strategy(self, plan: TaskPlan) -> TaskPlan:
+    def prepare_strategy(self, plan: TaskPlan) -> TaskPlan:
         if plan.routing.strategy not in {"consensus", "debate"}:
             return plan
         factory = self.strategy_executor_factory or (
