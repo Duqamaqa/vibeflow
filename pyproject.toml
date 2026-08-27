@@ -2,15 +2,33 @@
 name = "vibeflow"
 version = "0.3.0"
 description = "Dependency-light AI coding orchestrator for the FCC gateway"
+readme = "README.md"
+license = "MIT"
 authors = [{name = "Vibeflow"}]
 requires-python = ">=3.11"
 dependencies = []
+keywords = ["ai", "coding-agent", "fcc", "local-first", "orchestration"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Homepage = "https://github.com/Duqamaqa/vibeflow"
+Documentation = "https://github.com/Duqamaqa/vibeflow#readme"
+Issues = "https://github.com/Duqamaqa/vibeflow/issues"
+Source = "https://github.com/Duqamaqa/vibeflow"
 
 [project.scripts]
 vibeflow = "vibeflow.cli:main"
 
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]

@@ -1,14 +1,229 @@
 # Vibeflow
 
-Vibeflow is a dependency-light Python orchestrator for AI coding work. It owns task contracts, semantic routing, bounded context, independent review, deterministic verification, multi-agent strategies, telemetry, and budget policy. Free Claude Code (FCC) remains the provider gateway.
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-2ea44f.svg)](LICENSE)
+[![Localhost only](https://img.shields.io/badge/Dashboard-localhost%20only-6f42c1)](SECURITY.md)
+[![FCC required](https://img.shields.io/badge/Gateway-FCC%20required-f97316)](https://github.com/Alishahryar1/free-claude-code)
 
-## Local dashboard
+**A local control room for safer, more understandable AI coding.** Type a request in your browser, let Vibeflow plan and route the work, then inspect the proposed changes, automated checks, and independent review before the result reaches your project.
 
-Vibeflow includes a private coding control room at **http://127.0.0.1:8765**. This is where you type prompts, choose a target repository, preview a plan, run autonomous work, and inspect the route, changed files, deterministic checks, reviewer decision, and diff.
+> [!IMPORTANT]
+> **Vibeflow uses [Free Claude Code (FCC)](https://github.com/Alishahryar1/free-claude-code) as its required local AI gateway. Install and start FCC first, then install Vibeflow.** You do **not** need to clone the FCC source repository. FCC is a separate, independently maintained MIT-licensed project; Vibeflow does not bundle, copy, modify, or redistribute FCC code and is not affiliated with or endorsed by its maintainers.
 
-### First setup
+## Start here
 
-Requirements: macOS or Linux, Python 3.11+, [uv](https://docs.astral.sh/uv/), Git, and a running FCC gateway.
+### What you install
+
+| Part | What it does | Where credentials live |
+| --- | --- | --- |
+| **FCC** | Connects local tools to OpenAI, OpenRouter, NVIDIA NIM, and other model providers. | FCC's local Admin UI and configuration. |
+| **Vibeflow** | Plans tasks, chooses a model tier, applies validated changes safely, runs checks, and reviews the result. | Vibeflow does not store provider API keys. |
+| **Your project** | The Git repository Vibeflow is allowed to work on. | Your existing files stay in your local project. |
+
+The relationship is simple:
+
+```text
+You type a prompt in Vibeflow
+          ↓
+Vibeflow plans, protects, verifies, and reviews the work
+          ↓
+FCC sends model requests to the providers you configured
+          ↓
+The accepted file changes return to your local project
+```
+
+### 1. Install FCC first
+
+Use the official FCC installer. You do not need to download or clone its repository.
+
+**macOS or Linux**
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/Alishahryar1/free-claude-code/main/scripts/install.sh" | sh
+```
+
+Before running a downloaded script, you may [read the official installer](https://github.com/Alishahryar1/free-claude-code/blob/main/scripts/install.sh). For Windows instructions and current FCC requirements, use the [official FCC Quick Start](https://github.com/Alishahryar1/free-claude-code#quick-start).
+
+Start FCC:
+
+- **macOS:** open **Free Claude Code** from Applications.
+- **Linux:** run `fcc-server` and keep that terminal open.
+
+FCC opens its local Admin UI. Connect at least one model provider there. For the default Vibeflow routes, connect ChatGPT under **Providers → Connected accounts** and configure NVIDIA NIM and/or OpenRouter if you want those worker tiers. Provider availability, prices, subscriptions, and usage rules are controlled by those providers and may change.
+
+> [!CAUTION]
+> Put provider keys and connected-account credentials only in FCC's local Admin UI. Never paste keys into the Vibeflow repository, a prompt, a GitHub issue, a screenshot, or a commit.
+
+### 2. Install Vibeflow
+
+Install the latest public version directly from GitHub:
+
+```bash
+uv tool install git+https://github.com/Duqamaqa/vibeflow.git
+vibeflow --help
+```
+
+This creates an isolated user-local command. It does not modify system Python. The FCC installer normally provides or verifies `uv`; otherwise install it from the [official uv documentation](https://docs.astral.sh/uv/getting-started/installation/).
+
+### 3. Prepare a project once
+
+Open the project you want Vibeflow to edit, then create its safe local configuration:
+
+```bash
+cd /absolute/path/to/your-project
+vibeflow init
+vibeflow doctor
+```
+
+`init` adds a small `.ai/` configuration area without overwriting existing files. Review and commit those non-secret project instructions if you want your team to share them. `doctor` checks Git, FCC, model availability, and discovered verification commands.
+
+If `doctor` reports that no test command was discovered, Vibeflow itself may still be installed correctly; it means the target project does not yet expose a deterministic test command that Vibeflow can trust.
+
+### 4. Open the dashboard
+
+```bash
+vibeflow web --repo /absolute/path/to/your-project
+```
+
+Your browser opens at **http://127.0.0.1:8765**. Type your request in the large **New task** box.
+
+- **Plan only** explains the contract and route without model inference or file changes.
+- **Run safely** starts the complete coding pipeline.
+- **Approve flagged high-risk scope** approves that task's reviewed scope only. It never approves a commit, push, merge, publish, or deployment.
+
+Keep the terminal window open while using Vibeflow. Press `Ctrl+C` to stop it.
+
+### After restarting your computer
+
+1. Start **Free Claude Code** or run `fcc-server`.
+2. Start Vibeflow for the project you want to work on:
+
+```bash
+vibeflow web --repo /absolute/path/to/your-project
+```
+
+3. Open **http://127.0.0.1:8765** if the browser does not open automatically.
+
+## How Vibeflow works — without the jargon
+
+Vibeflow is the manager and safety layer; FCC is the connection to AI models.
+
+1. **Understands the request.** Vibeflow turns your prompt into a clear goal, boundaries, and success checklist.
+2. **Stops on risky ambiguity.** Sensitive or unclear work can return `needs-approval` before any model changes files.
+3. **Chooses the right model.** Simple work starts with a lower-cost worker; difficult work can use stronger models.
+4. **Limits what the model sees.** The worker receives relevant project context instead of an uncontrolled copy of everything.
+5. **Accepts only structured changes.** The worker must propose validated create, update, delete, or rename operations—not arbitrary shell instructions.
+6. **Works in isolation.** Vibeflow prepares changes away from your main working copy and protects unrelated uncommitted work.
+7. **Checks the result.** It creates the real Git diff and runs discovered tests, linting, type checks, and builds.
+8. **Uses a fresh reviewer.** A separate strong model sees the task, relevant context, diff, and check results—not the worker's private reasoning.
+9. **Repairs within limits.** Failed review can trigger a bounded repair-and-review loop. It cannot retry forever.
+10. **Returns evidence.** The final state is `done`, `blocked`, or `needs-approval`, with changed files and verification results.
+
+Vibeflow never automatically commits, pushes, merges, publishes, deploys, or edits protected credential and policy paths.
+
+## FCC, ownership, and rights
+
+Vibeflow deliberately keeps FCC outside this repository:
+
+- FCC is a **required runtime dependency** and runs as a separate local process, normally at `127.0.0.1:8082`.
+- Vibeflow communicates with FCC through its local HTTP interface.
+- Vibeflow does not include FCC source code, binaries, installers, branding, or credentials.
+- Vibeflow does not install, update, configure, or manage FCC automatically.
+- FCC is published separately under the [MIT License](https://github.com/Alishahryar1/free-claude-code/blob/main/LICENSE). Its maintainers control its code, releases, documentation, name, and support.
+- Vibeflow is also MIT-licensed, but its license covers Vibeflow only—not FCC, model providers, coding agents, or their services.
+- Vibeflow is not affiliated with or endorsed by FCC, Anthropic, OpenAI, OpenRouter, NVIDIA, or other providers. Their names and trademarks belong to their respective owners.
+
+This separation is intentional: it makes installation and ownership clearer and avoids presenting third-party code as part of Vibeflow. Users remain responsible for reviewing FCC and provider terms, choosing permitted integrations, and protecting their accounts. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [SECURITY.md](SECURITY.md).
+
+## Security and privacy
+
+- The dashboard binds to `127.0.0.1` and refuses public network binding.
+- It does not store credentials in cookies, URLs, `localStorage`, or `sessionStorage`.
+- Provider credentials remain in FCC's local configuration.
+- Prompts and task evidence are redacted before local task-state persistence.
+- File operations reject path traversal, symlink escape, `.git` internals, secrets, protected paths, and configured denylist matches.
+- Pre-existing dirty files are protected from autonomous overwrites.
+- `.env`, private keys, credentials, local task state, and common editor artifacts are excluded by `.gitignore`.
+
+Localhost is not a substitute for operating-system security. Do not expose the dashboard through a tunnel, reverse proxy, shared container, or remote bind. Read [SECURITY.md](SECURITY.md) before connecting providers or publishing a fork.
+
+## Other ways to enter prompts
+
+The browser dashboard is the recommended interface. The command line is also available.
+
+**Interactive session**
+
+```bash
+cd /absolute/path/to/your-project
+vibeflow chat
+```
+
+Type requests after the `vibeflow>` prompt. Use `/plan <request>`, `/status`, and `/quit` inside the session.
+
+**One task**
+
+```bash
+vibeflow run --repo /absolute/path/to/your-project "Fix the failing parser tests without changing the public API"
+```
+
+**Plan without changes**
+
+```bash
+vibeflow plan --repo /absolute/path/to/your-project "Refactor the cache layer"
+```
+
+## Command reference
+
+| Command | Purpose |
+| --- | --- |
+| `vibeflow init` | Create missing project configuration without overwriting existing files. |
+| `vibeflow doctor` | Check Python, Git, FCC, models, and verification tools. |
+| `vibeflow models --live` | Show configured tiers and models currently exposed by FCC. |
+| `vibeflow web` / `vibeflow ui` | Start the loopback-only browser dashboard. |
+| `vibeflow chat` | Start an interactive prompt session. |
+| `vibeflow plan` | Build the contract, route, context, skills, and task graph without inference. |
+| `vibeflow run` | Run one autonomous task; add `--dry-run` for a no-inference preflight. |
+| `vibeflow status` | Show the latest task outcome. |
+| `vibeflow telemetry report` | Show aggregate request telemetry. |
+| `vibeflow benchmark` | Prepare benchmark work; live paid calls require explicit flags. |
+
+Use `--no-open` to open the dashboard link yourself or `--port 9000` if port 8765 is busy. Vibeflow currently targets macOS and Linux with Python 3.11+, Git, and `uv`.
+
+## Technical pipeline
+
+```text
+prompt
+  → contract and approval policy
+  → bounded repository context
+  → semantic cheap / standard / strong routing
+  → FCC-backed worker
+  → validated structured change proposal
+  → isolated Git worktree or safe copy
+  → generated Git diff
+  → deterministic verification
+  → fresh strong-tier review
+  → bounded resolver loop when needed
+  → hash-guarded promotion
+  → done / blocked / needs-approval
+```
+
+Clear low-risk tasks may proceed automatically. Material ambiguity, production deployment, authentication or authorization, payments, credentials, destructive data changes, and database or schema migrations require approval. A blocked task rolls back its isolated task changes. Approval never grants permission to commit, push, merge, publish, or deploy.
+
+## Model routing
+
+The checked-in defaults selected on August 27, 2026 are:
+
+- **Cheap:** `nvidia_nim/deepseek-ai/deepseek-v4-flash-0731`
+- **Standard:** `open_router/deepseek/deepseek-v4-pro-0813`
+- **Strong:** `auto:openai-codex`
+
+The strong route discovers the best compatible OpenAI/Codex model exposed by the user's FCC instance instead of hardcoding an account-dependent ID. FCC may expose provider models through an Anthropic-compatible transport prefix; Vibeflow treats that as protocol routing and rejects Claude/Anthropic inference model IDs from the selected pipeline.
+
+Model availability, quality, prices, and provider policies change. Published benchmarks inform the defaults, but deterministic checks and independent review—not a benchmark score—decide whether a task is accepted. See [ROUTING_AND_BENCHMARKS.md](ROUTING_AND_BENCHMARKS.md).
+
+## Development install
+
+Contributors who want a source checkout can use:
 
 ```bash
 git clone https://github.com/Duqamaqa/vibeflow.git
@@ -17,160 +232,24 @@ uv tool install --editable .
 vibeflow --help
 ```
 
-`uv tool install` creates an isolated user-local command. It does not modify system Python.
-
-### Start after a computer restart
-
-Start FCC first, then run this command with the repository you want Vibeflow to edit:
+Run the tests without paid inference:
 
 ```bash
-vibeflow web --repo /absolute/path/to/your-project
-```
-
-Your browser opens automatically at **http://127.0.0.1:8765**. Keep the terminal window open while you use Vibeflow. Press `Ctrl+C` to stop it.
-
-If you do not want the user-local command, run directly from a clone instead:
-
-```bash
-uv run --project /absolute/path/to/vibeflow vibeflow web --repo /absolute/path/to/your-project
-```
-
-Use `--no-open` when you want to open the link yourself. Use `--port 9000` if port 8765 is already occupied. Vibeflow refuses non-localhost binding.
-
-### Where prompts go
-
-Type natural-language coding requests in the large **New task** box:
-
-- **Plan only** builds the contract and route without inference or file changes.
-- **Run safely** starts the complete autonomous pipeline.
-- **Approve flagged high-risk scope** approves only the reviewed contract; it never authorizes commit, push, merge, publish, or deploy.
-- Change **Target repository** to point the same running dashboard at another local project.
-
-The dashboard does not store API keys, tokens, prompts, or repository data in browser storage. Credentials remain in FCC's local connected-account configuration. See [SECURITY.md](SECURITY.md) before connecting providers or publishing a fork.
-
-## Responsibility boundary
-
-Vibeflow never stores provider keys and does not reimplement provider authentication, protocol conversion, provider retries, fallback/failover, reasoning translation, or provider concurrency. FCC owns those concerns. Vibeflow talks only to FCC's local HTTP interface.
-
-```text
-User
-  -> Vibeflow CTO contract and router
-  -> isolated worker(s)
-  -> fresh reviewer
-  -> resolver and deterministic verifier
-  -> final done / blocked / needs-approval result
-
-Vibeflow -> FCC localhost gateway -> connected OpenAI / OpenRouter / NVIDIA providers
-```
-
-## How I use Vibeflow every day
-
-Requirements: Python 3.11 or newer, `uv`, Git, and FCC running at `127.0.0.1:8082`.
-
-The supported no-global-install command is `uv run`. From the Vibeflow source repository:
-
-```bash
-uv run vibeflow --help
-uv run python -m vibeflow --help
-uv run vibeflow doctor
-uv run vibeflow models --live
-uv run vibeflow web --repo /path/to/my-project
-```
-
-To make `vibeflow` available as a short user-local command everywhere, optionally run this once. This uses `uv`'s isolated tool environment and does not modify system Python:
-
-```bash
-uv tool install --editable .
-vibeflow --help
-```
-
-### Where I type prompts
-
-For an ongoing session, enter the target project and start the REPL. Type each natural-language coding request at the `vibeflow>` prompt:
-
-```bash
-cd /path/to/my-project
-uv run --project /path/to/vibeflow vibeflow chat
-```
-
-For one task, put the prompt directly after `run`:
-
-```bash
-cd /path/to/my-project
-uv run --project /path/to/vibeflow vibeflow run "Fix the failing parser tests and keep the public API compatible"
-```
-
-The current directory is the target repository. Use `--repo` when you do not want to change directories:
-
-```bash
-uv run --project /path/to/vibeflow vibeflow run --repo /path/to/my-project "Add request validation and tests"
-```
-
-Use `plan` for contract/route/context only, or `run --dry-run` for a no-inference preflight:
-
-```bash
-uv run --project /path/to/vibeflow vibeflow plan "Refactor the cache layer"
-uv run --project /path/to/vibeflow vibeflow run --dry-run "Refactor the cache layer"
-uv run --project /path/to/vibeflow vibeflow status
-```
-
-Ordinary tests never make inference calls:
-
-```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
+PYTHONPATH=src python3 -W error -m unittest discover -s tests -v
 python3 -m compileall -q src tests
 ```
 
-## FCC and OpenAI subscription access
+Live FCC health and model-catalog tests skip cleanly when FCC is unavailable. Ordinary unit tests use fakes and do not make paid inference calls.
 
-FCC 5.13.10 supports an `openai/<model-id>` provider backed by a connected ChatGPT account. In FCC Admin, open **Providers -> Connected accounts**, connect ChatGPT, then restart any already-running agent. Headless systems can use FCC's device-code flow. This connection lives in FCC, not Vibeflow.
+## Project documentation
 
-Official OpenAI documentation distinguishes ChatGPT subscription sign-in from API-key usage. Codex local clients can sign in with ChatGPT for subscription access; API-key usage is separately billed. See [OpenAI authentication](https://learn.chatgpt.com/docs/auth).
+- [Security model and secret-handling rules](SECURITY.md)
+- [Contributor guide](CONTRIBUTING.md)
+- [Third-party ownership and attribution](THIRD_PARTY_NOTICES.md)
+- [Routing choices and benchmark research](ROUTING_AND_BENCHMARKS.md)
+- [Detailed system architecture](AI_Coding_Architecture_v2.md)
+- [MIT License](LICENSE)
 
-Vibeflow does not read `~/.codex/auth.json`, `~/.fcc`, or provider environment variables. If FCC proxy authentication is enabled, pass only the FCC proxy bearer token to Vibeflow through its own runtime option or environment; never copy provider keys into this project.
+## License
 
-## What is automatic
-
-- Clear low-risk tasks auto-proceed; material ambiguity or high risk stops for approval.
-- Routing uses logical `cheap`, `standard`, and `strong` tiers. The 60/30/10 idea is a cost philosophy, not a quota.
-- Failures and uncertainty escalate at most twice: `cheap -> standard -> strong`.
-- Reviewers receive only the contract, bounded context, diff, and verification output.
-- Workers must return validated create/update/delete/rename operations with SHA-256 preconditions. Arbitrary shell prose and worker-claimed diffs fail closed.
-- Changes run in a detached Git worktree when the target has a commit, otherwise in an isolated safe copy. Pre-existing dirty paths are protected and unrelated dirty files are preserved.
-- Vibeflow generates the diff itself, runs discovered tests/lint/typecheck/build, and sends only contract, bounded context, diff, and verification evidence to a fresh reviewer.
-- Reviewer failure triggers at most three total resolver iterations and at most two model-tier escalations. A blocked task rolls back the isolated task changes.
-- A proposal is not `done` until deterministic checks and the fresh strong-tier review pass and hash-guarded promotion to the target repository succeeds.
-- Consensus and debate are reserved for high-value, high-uncertainty decisions.
-- No command commits, pushes, merges, deploys, publishes, or changes protected policy/secret paths.
-
-## What still requires approval
-
-- Deterministically flagged high-risk work such as production deployment, authentication/authorization, payments, credentials, destructive data changes, and database/schema migrations returns `needs-approval`.
-- Review the generated plan, then re-run the same command with `--approve` if the scope is correct.
-- External writes, commits, pushes, merges, deployment, and publishing are never implied by `--approve`; request those separately outside the autonomous apply pipeline.
-
-## CLI behavior
-
-- `web`/`ui` starts the loopback-only dashboard and opens the browser.
-- `init` creates missing `.ai` memory/config files and never overwrites existing ones.
-- `doctor` checks Python, Git state, discovered verification commands, and FCC health.
-- `models --live` reads FCC model metadata without making an inference request.
-- `chat` is the prompt REPL. `/plan <request>`, `/status`, and `/quit` are available inside it.
-- `plan` builds the real local contract, route, context, skills, and task graph without inference.
-- `run` is the one-shot autonomous path. `--dry-run` disables inference and changes.
-- `benchmark` is dry by default; `--live`/`--allow-paid` is the only paid-call gate.
-- `status` reads the most recent task outcome; `telemetry report` reads aggregate request telemetry.
-
-## Model tiers selected August 27, 2026
-
-- `cheap`: `nvidia_nim/deepseek-ai/deepseek-v4-flash-0731`. The live FCC catalog exposes this NVIDIA NIM route. OpenRouter lists the same underlying model at $0.035/M input and $0.28/M output with 29 providers, while Artificial Analysis scores the max-effort variant 52 and reports 133.1 output tokens/second. It is the mechanical-edit/default-cost tier.
-- `standard`: `open_router/deepseek/deepseek-v4-pro-0813`. The live FCC catalog exposes this exact OpenRouter route. OpenRouter lists the GA model at $0.66/M input and $1.98/M output with 15 providers. Artificial Analysis scores it 53 and places it among the leading open-weight models.
-- `strong`: `auto:openai-codex`. Vibeflow reads FCC `/v1/models` and selects the highest-ranked available OpenAI/Codex model instead of hardcoding an account-dependent slug. Official OpenAI documentation currently recommends GPT-5.6 Sol for complex reasoning and coding; GPT-5.3-Codex remains a specialized agentic-coding model. Catalog visibility still does not prove the connected account can execute, so `doctor` requires FCC health and valid tier resolution before work starts.
-
-FCC currently prefixes these live IDs with `anthropic/` because it exposes them through an Anthropic-compatible transport adapter. That prefix is protocol routing, not the model vendor. Vibeflow permits the wrapper only for non-Anthropic providers and rejects every catalog ID containing `claude` or the `~anthropic` model alias. The selected inference models remain DeepSeek and OpenAI.
-
-Sources: [OpenAI model guidance](https://developers.openai.com/api/docs/guides/latest-model), [GPT-5.3-Codex](https://developers.openai.com/api/docs/models/gpt-5.3-codex), [OpenRouter DeepSeek V4 Flash 0731](https://openrouter.ai/deepseek/deepseek-v4-flash-0731), [OpenRouter DeepSeek V4 Pro 0813](https://openrouter.ai/deepseek/deepseek-v4-pro-0813), [Artificial Analysis V4 Flash](https://artificialanalysis.ai/models/deepseek-v4-flash), [Artificial Analysis V4 Pro](https://artificialanalysis.ai/models/deepseek-v4-pro), and [NVIDIA NIM models](https://build.nvidia.com/models).
-
-No Anthropic/Claude inference model appears in the selected pipeline. Published benchmarks are cross-checks, not proof for every repository; deterministic project verification and independent review remain the acceptance gates.
-
-See `AI_Coding_Architecture_v2.md` and `ROUTING_AND_BENCHMARKS.md` for details.
+Vibeflow is released under the [MIT License](LICENSE). Third-party projects and services retain their own licenses, terms, and trademarks.
