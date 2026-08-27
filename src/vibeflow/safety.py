@@ -22,6 +22,8 @@ DEFAULT_PROTECTED_PATTERNS: tuple[str, ...] = (
     ".ai/state.json",
     ".ai/routing.toml",
     ".ai/vibeflow.toml",
+    ".ai/skills",
+    ".ai/skills/**",
     ".env",
     ".env.*",
     "**/.env",

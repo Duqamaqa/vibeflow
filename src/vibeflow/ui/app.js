@@ -6,11 +6,14 @@ const state = {
   task: null,
   pollTimer: null,
   activeTab: "summary",
+  selectedSkills: new Set(),
 };
 
 const elements = {
   repoInput: document.querySelector("#repo-input"),
+  browseRepo: document.querySelector("#browse-repo"),
   loadRepo: document.querySelector("#load-repo"),
+  setupRepo: document.querySelector("#setup-repo"),
   refresh: document.querySelector("#refresh-button"),
   promptForm: document.querySelector("#prompt-form"),
   promptInput: document.querySelector("#prompt-input"),
@@ -23,6 +26,23 @@ const elements = {
   systemDetail: document.querySelector("#system-detail"),
   gitBadge: document.querySelector("#git-badge"),
   modelCards: document.querySelector("#model-cards"),
+  skillList: document.querySelector("#skill-list"),
+  emptySkills: document.querySelector("#empty-skills"),
+  skillCount: document.querySelector("#skill-count"),
+  selectedSkillCount: document.querySelector("#selected-skill-count"),
+  skillErrors: document.querySelector("#skill-errors"),
+  importSkill: document.querySelector("#import-skill"),
+  createSkill: document.querySelector("#create-skill"),
+  skillDialog: document.querySelector("#skill-dialog"),
+  skillForm: document.querySelector("#skill-form"),
+  closeSkillDialog: document.querySelector("#close-skill-dialog"),
+  cancelSkill: document.querySelector("#cancel-skill"),
+  skillName: document.querySelector("#skill-name"),
+  skillDescription: document.querySelector("#skill-description"),
+  skillTriggers: document.querySelector("#skill-triggers"),
+  skillCost: document.querySelector("#skill-cost"),
+  skillRisk: document.querySelector("#skill-risk"),
+  skillInstructions: document.querySelector("#skill-instructions"),
   statusBadge: document.querySelector("#task-status-badge"),
   pipelineSteps: [...document.querySelectorAll("#pipeline-steps li")],
   emptyEvidence: document.querySelector("#empty-evidence"),
@@ -60,10 +80,18 @@ function showToast(message, isError = false) {
 }
 
 function setBusy(busy) {
-  elements.planButton.disabled = busy;
-  elements.runButton.disabled = busy;
-  elements.repoInput.disabled = busy;
-  elements.loadRepo.disabled = busy;
+  for (const control of [
+    elements.planButton,
+    elements.runButton,
+    elements.repoInput,
+    elements.browseRepo,
+    elements.loadRepo,
+    elements.setupRepo,
+    elements.importSkill,
+    elements.createSkill,
+  ]) {
+    control.disabled = busy;
+  }
 }
 
 async function loadBootstrap(repo = "") {
@@ -71,12 +99,20 @@ async function loadBootstrap(repo = "") {
   setSystemLoading();
   try {
     const payload = await api(`/api/bootstrap${query}`);
+    const repositoryChanged = Boolean(state.repo && state.repo !== payload.repo_root);
+    if (repositoryChanged) {
+      state.selectedSkills.clear();
+      state.task = null;
+      resetEvidence();
+    }
     state.bootstrap = payload;
     state.repo = payload.repo_root;
     elements.repoInput.value = payload.repo_root;
     elements.footerRepo.textContent = payload.repo_name.toUpperCase();
     renderSystem(payload);
     renderModels(payload.routing);
+    renderSkills(payload.skills || { items: [], errors: [] });
+    elements.setupRepo.hidden = !(payload.setup_required && payload.git && payload.git.is_repository);
     const liveTask = payload.tasks.find((task) => ["queued", "running"].includes(task.status));
     if (liveTask) {
       state.task = liveTask;
@@ -148,6 +184,70 @@ function renderModels(routing) {
   }
 }
 
+function renderSkills(skillState) {
+  const skills = Array.isArray(skillState.items) ? skillState.items : [];
+  const available = new Set(skills.map((skill) => skill.name));
+  state.selectedSkills = new Set([...state.selectedSkills].filter((name) => available.has(name)));
+  elements.skillList.replaceChildren();
+  elements.emptySkills.hidden = skills.length > 0;
+  elements.skillCount.textContent = `${skills.length} skill${skills.length === 1 ? "" : "s"} available`;
+  updateSelectedSkillCount();
+  const errors = Array.isArray(skillState.errors) ? skillState.errors : [];
+  elements.skillErrors.hidden = errors.length === 0;
+  elements.skillErrors.textContent = errors.length ? `Some skills could not be loaded: ${errors.join(" · ")}` : "";
+
+  for (const skill of skills) {
+    const card = document.createElement("article");
+    card.className = `skill-card${state.selectedSkills.has(skill.name) ? " selected" : ""}`;
+    const checkbox = document.createElement("input");
+    const checkboxId = `skill-${skill.name.replace(/[^A-Za-z0-9_-]/g, "-")}`;
+    checkbox.id = checkboxId;
+    checkbox.type = "checkbox";
+    checkbox.checked = state.selectedSkills.has(skill.name);
+    const label = document.createElement("label");
+    label.className = "skill-toggle";
+    label.htmlFor = checkboxId;
+    const check = document.createElement("span");
+    check.className = "skill-check";
+    check.textContent = "✓";
+    const copy = document.createElement("span");
+    copy.className = "skill-copy";
+    const name = document.createElement("strong");
+    name.textContent = skill.name;
+    const description = document.createElement("p");
+    description.textContent = skill.description;
+    const tags = document.createElement("span");
+    tags.className = "skill-tags";
+    for (const value of [...(skill.triggers || []).slice(0, 3), `${skill.risk || "low"} risk`]) {
+      const tag = document.createElement("span");
+      tag.className = "skill-tag";
+      tag.textContent = value;
+      tags.append(tag);
+    }
+    copy.append(name, description, tags);
+    label.append(check, copy);
+    const remove = document.createElement("button");
+    remove.className = "skill-remove";
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", `Remove ${skill.name}`);
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) state.selectedSkills.add(skill.name);
+      else state.selectedSkills.delete(skill.name);
+      card.classList.toggle("selected", checkbox.checked);
+      updateSelectedSkillCount();
+    });
+    remove.addEventListener("click", () => removeSkill(skill.name));
+    card.append(checkbox, label, remove);
+    elements.skillList.append(card);
+  }
+}
+
+function updateSelectedSkillCount() {
+  const count = state.selectedSkills.size;
+  elements.selectedSkillCount.textContent = `${count} selected`;
+}
+
 async function submitTask(action) {
   const prompt = elements.promptInput.value.trim();
   if (!prompt) {
@@ -165,6 +265,7 @@ async function submitTask(action) {
         prompt,
         repo: state.repo || elements.repoInput.value.trim(),
         approved: elements.approvalInput.checked,
+        skills: [...state.selectedSkills],
       }),
     });
     state.task = task;
@@ -203,6 +304,13 @@ function resetPipeline() {
     step.className = "";
     step.querySelector(".step-state").textContent = "—";
   }
+}
+
+function resetEvidence() {
+  elements.emptyEvidence.hidden = false;
+  elements.evidenceContent.hidden = true;
+  elements.copyOutput.disabled = true;
+  resetPipeline();
 }
 
 function renderTask(task) {
@@ -282,6 +390,7 @@ function renderEvidence(result, error, task) {
   elements.summaryTab.replaceChildren(grid);
   addSummarySection("Outcome", error || data.blocker || worker.summary || review.feedback || (task.action === "plan" ? "Plan prepared without changing files." : "Task completed."));
   addSummarySection("Reviewer", reviewState + (review.feedback ? ` — ${review.feedback}` : ""));
+  addSummarySection("Skills", (data.skills || task.selected_skills || []).join(", ") || "No reusable skills selected.");
   if (changedFiles.length) addFilesSection(changedFiles);
   const contract = data.contract;
   if (contract && contract.goal) addSummarySection("Contract", contract.goal);
@@ -331,6 +440,129 @@ function switchTab(tabName) {
   elements.rawTab.hidden = tabName !== "raw";
 }
 
+async function browseRepository() {
+  setBusy(true);
+  showToast("Opening the folder chooser…");
+  try {
+    const result = await api("/api/picker", {
+      method: "POST",
+      body: JSON.stringify({ purpose: "repository", current: state.repo }),
+    });
+    if (result.selected) {
+      await loadBootstrap(result.path);
+      showToast("Repository selected.");
+    } else {
+      showToast("Folder selection cancelled.");
+    }
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function setupRepository() {
+  setBusy(true);
+  try {
+    const result = await api("/api/repositories/init", {
+      method: "POST",
+      body: JSON.stringify({ repo: state.repo }),
+    });
+    await loadBootstrap(state.repo);
+    showToast(result.status === "created" ? "Repository is ready for Vibeflow." : "Repository was already ready.");
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function importSkill() {
+  setBusy(true);
+  showToast("Choose a folder containing SKILL.md…");
+  try {
+    const picked = await api("/api/picker", {
+      method: "POST",
+      body: JSON.stringify({ purpose: "skill", current: state.repo }),
+    });
+    if (!picked.selected) {
+      showToast("Skill import cancelled.");
+      return;
+    }
+    const result = await api("/api/skills/import", {
+      method: "POST",
+      body: JSON.stringify({ repo: state.repo, source: picked.path }),
+    });
+    await loadBootstrap(state.repo);
+    state.selectedSkills.add(result.skill.name);
+    renderSkills(state.bootstrap.skills);
+    showToast(`${result.skill.name} imported and selected.`);
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function removeSkill(name) {
+  if (!window.confirm(`Remove the ${name} skill from this repository?`)) return;
+  setBusy(true);
+  try {
+    await api("/api/skills/remove", {
+      method: "POST",
+      body: JSON.stringify({ repo: state.repo, name }),
+    });
+    state.selectedSkills.delete(name);
+    await loadBootstrap(state.repo);
+    showToast(`${name} removed.`);
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+function openSkillDialog() {
+  elements.skillForm.reset();
+  if (typeof elements.skillDialog.showModal === "function") elements.skillDialog.showModal();
+  else elements.skillDialog.setAttribute("open", "");
+  window.setTimeout(() => elements.skillName.focus(), 0);
+}
+
+function closeSkillDialog() {
+  if (typeof elements.skillDialog.close === "function") elements.skillDialog.close();
+  else elements.skillDialog.removeAttribute("open");
+}
+
+async function createSkill(event) {
+  event.preventDefault();
+  const triggers = elements.skillTriggers.value.split(",").map((value) => value.trim()).filter(Boolean);
+  setBusy(true);
+  try {
+    const result = await api("/api/skills/create", {
+      method: "POST",
+      body: JSON.stringify({
+        repo: state.repo,
+        name: elements.skillName.value.trim(),
+        description: elements.skillDescription.value.trim(),
+        triggers,
+        instructions: elements.skillInstructions.value,
+        cost: elements.skillCost.value,
+        risk: elements.skillRisk.value,
+      }),
+    });
+    closeSkillDialog();
+    await loadBootstrap(state.repo);
+    state.selectedSkills.add(result.skill.name);
+    renderSkills(state.bootstrap.skills);
+    showToast(`${result.skill.name} created and selected.`);
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    setBusy(false);
+  }
+}
+
 elements.promptForm.addEventListener("submit", (event) => {
   event.preventDefault();
   submitTask("run");
@@ -346,10 +578,17 @@ elements.promptInput.addEventListener("keydown", (event) => {
   }
 });
 elements.loadRepo.addEventListener("click", () => loadBootstrap(elements.repoInput.value.trim()));
+elements.browseRepo.addEventListener("click", browseRepository);
+elements.setupRepo.addEventListener("click", setupRepository);
 elements.repoInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") loadBootstrap(elements.repoInput.value.trim());
 });
 elements.refresh.addEventListener("click", () => loadBootstrap(state.repo));
+elements.importSkill.addEventListener("click", importSkill);
+elements.createSkill.addEventListener("click", openSkillDialog);
+elements.skillForm.addEventListener("submit", createSkill);
+elements.closeSkillDialog.addEventListener("click", closeSkillDialog);
+elements.cancelSkill.addEventListener("click", closeSkillDialog);
 elements.tabs.forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
 elements.copyOutput.addEventListener("click", async () => {
   if (!state.task) return;

@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+import tempfile
 
 from src.vibeflow.skills import (
     Skill,
@@ -6,7 +8,10 @@ from src.vibeflow.skills import (
     SkillMetadata,
     SkillRegistry,
     SkillRisk,
+    RepositorySkillStore,
+    load_repository_skills,
 )
+from src.vibeflow.safety import SafetyViolation
 
 
 class TestSkillRegistry(unittest.TestCase):
@@ -122,6 +127,107 @@ class TestSkillRegistry(unittest.TestCase):
             )
 
 
+class TestRepositorySkillStore(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp_dir.name)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_create_load_and_remove_instruction_skill(self):
+        store = RepositorySkillStore(self.root)
+        store.create(
+            name="frontend-a11y",
+            description="Apply the frontend accessibility standard",
+            instructions="Require labels, focus states, and keyboard support.",
+            triggers=("accessibility", "frontend"),
+            capabilities=("ui",),
+        )
+
+        catalog = load_repository_skills(self.root)
+
+        self.assertEqual(catalog.errors, ())
+        self.assertEqual(catalog.registry.names(), ("frontend-a11y",))
+        self.assertIn("keyboard support", catalog.registry.load_prompt("frontend-a11y"))
+        store.remove("frontend-a11y")
+        self.assertEqual(store.catalog().registry.names(), ())
+
+    def test_import_reads_only_skill_document(self):
+        source = self.root / "external"
+        source.mkdir()
+        (source / "SKILL.md").write_text(
+            """---
+name: "review-pro"
+description: "Review production changes"
+triggers:
+  - "code review"
+risk: medium
+---
+
+Review correctness, security, and regressions.
+""",
+            encoding="utf-8",
+        )
+        (source / "run.sh").write_text("echo should-not-copy\n", encoding="utf-8")
+        target = self.root / "target"
+        target.mkdir()
+
+        metadata = RepositorySkillStore(target).import_from(source)
+
+        self.assertEqual(metadata.name, "review-pro")
+        self.assertFalse((target / ".ai" / "skills" / "review-pro" / "run.sh").exists())
+
+    def test_import_rejects_secrets_and_symlinks(self):
+        source = self.root / "unsafe"
+        source.mkdir()
+        token = "sk-proj-" + "abcdefghijklmnopqrstuvwxyz"
+        (source / "SKILL.md").write_text(
+            f"---\nname: unsafe\ndescription: unsafe\n---\nUse {token}\n",
+            encoding="utf-8",
+        )
+        target = self.root / "target"
+        target.mkdir()
+
+        with self.assertRaises(SafetyViolation):
+            RepositorySkillStore(target).import_from(source)
+
+        linked = self.root / "linked"
+        linked.symlink_to(source, target_is_directory=True)
+        with self.assertRaises(SafetyViolation):
+            RepositorySkillStore(target).import_from(linked)
+
+    def test_import_rejects_symbolic_linked_document(self):
+        source = self.root / "source"
+        source.mkdir()
+        instructions = self.root / "instructions.md"
+        instructions.write_text(
+            "---\nname: linked\ndescription: linked\n---\nUnsafe link.\n",
+            encoding="utf-8",
+        )
+        (source / "SKILL.md").symlink_to(instructions)
+        target = self.root / "target"
+        target.mkdir()
+
+        with self.assertRaises(SafetyViolation):
+            RepositorySkillStore(target).import_from(source)
+
+    def test_remove_preserves_skill_when_folder_has_extra_files(self):
+        store = RepositorySkillStore(self.root)
+        store.create(
+            name="docs",
+            description="Improve documentation",
+            instructions="Write clear documentation.",
+        )
+        skill_directory = self.root / ".ai" / "skills" / "docs"
+        (skill_directory / "notes.txt").write_text("keep", encoding="utf-8")
+
+        with self.assertRaises(SafetyViolation):
+            store.remove("docs")
+
+        self.assertTrue((skill_directory / "SKILL.md").is_file())
+        self.assertTrue((skill_directory / "notes.txt").is_file())
+
+
 if __name__ == "__main__":
     unittest.main()
-

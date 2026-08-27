@@ -46,8 +46,11 @@ class TestRepositoryScope(unittest.TestCase):
         self.assertTrue(is_protected_path(".env"))
         self.assertTrue(is_protected_path("nested/private.key"))
         self.assertTrue(is_protected_path(".git/config"))
+        self.assertTrue(is_protected_path(".ai/skills/review/SKILL.md"))
         with self.assertRaises(SafetyViolation):
             validate_repo_scope(self.repo_root, ".env")
+        with self.assertRaises(SafetyViolation):
+            validate_repo_scope(self.repo_root, ".ai/skills/review/SKILL.md")
 
     def test_guard_can_explicitly_read_protected_path(self):
         guard = SafetyGuard(self.repo_root)

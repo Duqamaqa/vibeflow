@@ -20,7 +20,7 @@ from .fcc_client import FCCClient
 from .resolver import Resolver, ResolverResult
 from .router import Router, RoutingDecision
 from .safety import SafetyGuard, SafetyViolation, redact_secrets
-from .skills import SkillRegistry
+from .skills import SkillRegistry, SkillRisk, load_repository_skills
 from .state import TaskState, TaskStateStore
 from .telemetry import Telemetry
 
@@ -109,7 +109,9 @@ class Orchestrator:
         self.state_store = state_store or TaskStateStore(
             self.context_manager.repo_root / ".ai" / "state.json"
         )
-        self.skill_registry = skill_registry or SkillRegistry()
+        self.skill_registry = skill_registry or load_repository_skills(
+            self.context_manager.repo_root
+        ).registry
         self.budget_ledger_factory = budget_ledger_factory
         self.max_resolver_iterations = max_resolver_iterations
 
@@ -134,8 +136,24 @@ class Orchestrator:
         cto_override: str | None = None,
         context_budget: int = 8_000,
         subtasks: Iterable[dict[str, Any]] | None = None,
+        selected_skills: Iterable[str] = (),
     ) -> TaskPlan:
         files = list(context_files)
+        requested_skills: list[str] = []
+        requested_risk = SkillRisk.LOW
+        for name in selected_skills:
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("Selected skill names must be non-empty strings")
+            skill = self.skill_registry.get(name.strip())
+            requested_skills.append(skill.metadata.name)
+            requested_risk = max(requested_risk, skill.metadata.risk)
+        configured_risk = risk if isinstance(risk, Risk) else Risk(risk)
+        effective_risk = Risk[
+            max(
+                SkillRisk[configured_risk.name],
+                requested_risk,
+            ).name
+        ]
         contract = contract_from_request(
             task_goal,
             description=task_description,
@@ -143,7 +161,7 @@ class Orchestrator:
             constraints=constraints,
             non_goals=non_goals,
             failure_conditions=failure_conditions,
-            risk=risk,
+            risk=effective_risk,
             ambiguity=ambiguity,
             task_type=task_type,
             expected_scope=expected_scope,
@@ -161,13 +179,14 @@ class Orchestrator:
         )
         context = self.context_manager.build_context(contract, files, max_tokens=context_budget)
         graph = self.decomposer.decompose(contract, subtasks)
-        skills = tuple(
+        automatic_skills = tuple(
             match.skill.metadata.name
             for match in self.skill_registry.find(
                 contract.goal,
                 max_risk=contract.risk.value,
             )
         )
+        skills = tuple(dict.fromkeys((*requested_skills, *automatic_skills)))
         return TaskPlan(str(uuid.uuid4()), contract, routing, context, graph, skills)
 
     def execute_task(
@@ -211,7 +230,7 @@ class Orchestrator:
 
         self._save_running(plan)
         try:
-            plan = self._prepare_skills(plan)
+            plan = self.prepare_skills(plan)
             plan = self._prepare_strategy(plan)
             resolver = self._resolver(plan)
             resolution = resolver.resolve(plan.contract, plan.routing, plan.context)
@@ -293,7 +312,7 @@ class Orchestrator:
         ).trim()
         return replace(plan, context=context)
 
-    def _prepare_skills(self, plan: TaskPlan) -> TaskPlan:
+    def prepare_skills(self, plan: TaskPlan) -> TaskPlan:
         if not plan.selected_skills:
             return plan
         items = list(plan.context.items)

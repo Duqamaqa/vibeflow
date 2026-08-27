@@ -1,6 +1,6 @@
 [project]
 name = "vibeflow"
-version = "0.3.0"
+version = "0.4.0"
 description = "Dependency-light AI coding orchestrator for the FCC gateway"
 readme = "README.md"
 license = "MIT"

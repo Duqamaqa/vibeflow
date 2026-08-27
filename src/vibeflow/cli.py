@@ -28,37 +28,9 @@ from .model_selection import (
     load_routing_preferences,
     resolve_tier_models,
 )
+from .project_setup import initialize_repository
 from .safety import SafetyGuard, SafetyViolation, redact_secrets
 from .verifier import Verifier
-
-
-INIT_CONFIG = """version = 1
-default_mode = "autonomous"
-allow_auto_commit = false
-allow_auto_deploy = false
-
-[verification]
-timeout_seconds = 60
-
-[benchmark]
-live = false
-"""
-
-INIT_MEMORY_FILES = {
-    ".ai/architecture.md": "# Architecture\n\nDescribe stable system boundaries here.\n",
-    ".ai/decisions.md": "# Decisions\n\nRecord durable architecture decisions here.\n",
-    ".ai/coding_rules.md": "# Coding rules\n\n- Preserve unrelated changes.\n- Require deterministic verification.\n",
-    ".ai/routing.toml": (
-        "[tiers.cheap]\nmodel = \"nvidia_nim/deepseek-ai/deepseek-v4-flash-0731\"\n\n"
-        "[tiers.standard]\nmodel = \"open_router/deepseek/deepseek-v4-pro-0813\"\n\n"
-        "[tiers.strong]\nmodel = \"auto:openai-codex\"\n\n"
-        "[policy]\nmax_escalations = 2\n\n"
-        "[candidates]\n"
-        "cheap = [\"open_router/deepseek/deepseek-v4-flash-0731\"]\n"
-        "standard = [\"open_router/z-ai/glm-5.2\", \"open_router/moonshotai/kimi-k3\"]\n"
-        "strong = []\n"
-    ),
-}
 
 
 def _make_verifier(repo_root: Path) -> Verifier:
@@ -482,18 +454,11 @@ def _handle_init(
     dependencies: CLIDependencies,
 ) -> tuple[int, dict[str, Any]]:
     repo_root = _repo_root(args)
-    guard = dependencies.safety_factory(repo_root)
-    config_path = guard.validate_path(args.config, allow_protected=True)
-    templates = {args.config: INIT_CONFIG, **INIT_MEMORY_FILES}
-    created: list[str] = []
-    for relative_path, content in templates.items():
-        path = guard.validate_path(relative_path, allow_protected=True)
-        if path.exists():
-            continue
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("x", encoding="utf-8") as handle:
-            handle.write(content)
-        created.append(str(path))
+    config_path, created_paths = initialize_repository(
+        repo_root,
+        config_path=args.config,
+    )
+    created = [str(path) for path in created_paths]
     return 0, {
         "ok": True,
         "command": "init",

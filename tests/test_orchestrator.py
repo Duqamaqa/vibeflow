@@ -7,6 +7,7 @@ from vibeflow.context import ContextManager
 from vibeflow.orchestrator import Orchestrator, TaskStatus
 from vibeflow.resolver import ResolutionStatus, ResolverResult
 from vibeflow.reviewer import ReviewResult
+from vibeflow.skills import RepositorySkillStore
 from vibeflow.worker import WorkerResult
 
 
@@ -113,6 +114,39 @@ class TestOrchestrator(unittest.TestCase):
 
         self.assertEqual(result.status, TaskStatus.BLOCKED)
         self.assertIn("RuntimeError", result.blocker)
+
+    def test_selected_repository_skill_is_added_to_context(self):
+        RepositorySkillStore(self.root).create(
+            name="api-review",
+            description="Review API compatibility",
+            instructions="Preserve every public API signature.",
+            triggers=("api compatibility",),
+        )
+
+        result = self._orchestrator().execute_task(
+            "Refactor the parser",
+            selected_skills=("api-review",),
+        )
+
+        self.assertEqual(result.status, TaskStatus.DONE)
+        self.assertIn("api-review", result.plan.selected_skills)
+        self.assertIn("api-review", [item.name for item in result.plan.context.items])
+
+    def test_high_risk_skill_requires_approval(self):
+        RepositorySkillStore(self.root).create(
+            name="production-migration",
+            description="Prepare production migrations",
+            instructions="Require a rollback plan and explicit operator approval.",
+            triggers=("production migration",),
+            risk="high",
+        )
+
+        result = self._orchestrator().execute_task(
+            "Prepare the change",
+            selected_skills=("production-migration",),
+        )
+
+        self.assertEqual(result.status, TaskStatus.NEEDS_APPROVAL)
 
 
 if __name__ == "__main__":

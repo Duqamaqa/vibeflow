@@ -20,14 +20,18 @@ from .autonomous import AutonomousRunner, _infer_plan_options
 from .context import ContextManager
 from .fcc_client import FCCClient
 from .model_selection import load_routing_preferences
+from .native_dialog import NativeDialogError, choose_directory
 from .orchestrator import Orchestrator
+from .project_setup import initialize_repository
 from .safety import SafetyGuard, SafetyViolation, redact_secrets
+from .skills import RepositorySkillStore, skill_metadata_dict
 
 
 DEFAULT_DASHBOARD_HOST = "127.0.0.1"
 DEFAULT_DASHBOARD_PORT = 8765
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_PROMPT_CHARACTERS = 20_000
+MAX_SELECTED_SKILLS = 16
 _SAFE_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 
@@ -60,15 +64,29 @@ def _validate_repository(candidate: str | Path) -> Path:
     return root
 
 
-def _default_plan(goal: str, repo_root: Path) -> Any:
+def _default_plan(
+    goal: str,
+    repo_root: Path,
+    selected_skills: tuple[str, ...],
+) -> Any:
     return Orchestrator(context_manager=ContextManager(repo_root)).plan_task(
         goal,
+        selected_skills=selected_skills,
         **_infer_plan_options(goal),
     )
 
 
-def _default_run(goal: str, repo_root: Path, approved: bool) -> Any:
-    return AutonomousRunner(repo_root).run(goal, approved=approved)
+def _default_run(
+    goal: str,
+    repo_root: Path,
+    approved: bool,
+    selected_skills: tuple[str, ...],
+) -> Any:
+    return AutonomousRunner(repo_root).run(
+        goal,
+        approved=approved,
+        selected_skills=selected_skills,
+    )
 
 
 @dataclass(slots=True)
@@ -80,6 +98,7 @@ class DashboardTask:
     repo_root: str
     prompt: str
     approved: bool
+    selected_skills: tuple[str, ...] = ()
     status: str = "queued"
     stage: str = "queued"
     created_at: float = 0.0
@@ -98,14 +117,16 @@ class DashboardService:
         self,
         repo_root: str | Path,
         *,
-        planner: Callable[[str, Path], Any] = _default_plan,
-        runner: Callable[[str, Path, bool], Any] = _default_run,
+        planner: Callable[[str, Path, tuple[str, ...]], Any] = _default_plan,
+        runner: Callable[[str, Path, bool, tuple[str, ...]], Any] = _default_run,
         fcc_factory: Callable[[], FCCClient] | None = None,
+        directory_picker: Callable[[str, Path], Path | None] = choose_directory,
     ) -> None:
         self.repo_root = _validate_repository(repo_root)
         self.planner = planner
         self.runner = runner
         self.fcc_factory = fcc_factory or (lambda: FCCClient(timeout=1.0))
+        self.directory_picker = directory_picker
         self._tasks: dict[str, DashboardTask] = {}
         self._tasks_lock = threading.Lock()
         self._repo_locks: dict[str, threading.Lock] = {}
@@ -123,6 +144,8 @@ class DashboardService:
             )
         except (OSError, RuntimeError, ValueError) as exc:
             routing_error = str(exc)
+
+        skill_catalog = RepositorySkillStore(root).catalog()
 
         fcc_healthy = False
         fcc_error = None
@@ -147,6 +170,8 @@ class DashboardService:
                     "alternatives": alternatives,
                     "error": routing_error,
                 },
+                "setup_required": not (root / ".ai" / "routing.toml").is_file(),
+                "skills": skill_catalog.to_dict(),
                 "last_task": self._read_last_task(root),
                 "tasks": self.list_tasks(root),
                 "safety": {
@@ -166,6 +191,7 @@ class DashboardService:
         *,
         repo: str | Path | None = None,
         approved: bool = False,
+        selected_skills: tuple[str, ...] | list[str] = (),
     ) -> dict[str, Any]:
         if action not in {"plan", "run"}:
             raise ValueError("Action must be plan or run")
@@ -177,6 +203,7 @@ class DashboardService:
                 f"Prompt exceeds {MAX_PROMPT_CHARACTERS:,} characters"
             )
         root = _validate_repository(repo or self.repo_root)
+        normalized_skills = self._validate_selected_skills(root, selected_skills)
         now = time.time()
         task = DashboardTask(
             task_id=str(uuid.uuid4()),
@@ -184,6 +211,7 @@ class DashboardService:
             repo_root=str(root),
             prompt=normalized_prompt,
             approved=bool(approved),
+            selected_skills=normalized_skills,
             created_at=now,
             updated_at=now,
         )
@@ -198,6 +226,80 @@ class DashboardService:
         )
         thread.start()
         return task.to_dict()
+
+    def select_directory(
+        self,
+        purpose: str,
+        *,
+        current: str | Path | None = None,
+    ) -> dict[str, Any]:
+        if purpose not in {"repository", "skill"}:
+            raise ValueError("Picker purpose must be repository or skill")
+        initial = _validate_repository(current or self.repo_root)
+        prompt = (
+            "Choose a Git repository for Vibeflow"
+            if purpose == "repository"
+            else "Choose a skill folder containing SKILL.md"
+        )
+        selected = self.directory_picker(prompt, initial)
+        if selected is None:
+            return {"ok": True, "selected": False, "path": None}
+        path = _validate_repository(selected)
+        return {"ok": True, "selected": True, "path": str(path)}
+
+    def initialize(self, repo: str | Path | None = None) -> dict[str, Any]:
+        root = _validate_repository(repo or self.repo_root)
+        dirty_state = SafetyGuard(root).dirty_state()
+        if not dirty_state.is_repository:
+            raise SafetyViolation("Choose an existing Git repository before setup")
+        config_path, created = initialize_repository(root)
+        return {
+            "ok": True,
+            "repo_root": str(root),
+            "config_path": str(config_path),
+            "created": [str(path.relative_to(root)) for path in created],
+            "status": "created" if created else "already-ready",
+        }
+
+    def create_skill(self, repo: str | Path, payload: Mapping[str, Any]) -> dict[str, Any]:
+        root = _validate_repository(repo)
+        metadata = RepositorySkillStore(root).create(
+            name=str(payload.get("name", "")),
+            description=str(payload.get("description", "")),
+            instructions=str(payload.get("instructions", "")),
+            triggers=_string_list(payload.get("triggers"), "triggers"),
+            capabilities=_string_list(payload.get("capabilities"), "capabilities"),
+            cost=str(payload.get("cost", "low")),
+            risk=str(payload.get("risk", "low")),
+        )
+        return {"ok": True, "skill": skill_metadata_dict(metadata)}
+
+    def import_skill(self, repo: str | Path, source: str | Path) -> dict[str, Any]:
+        root = _validate_repository(repo)
+        metadata = RepositorySkillStore(root).import_from(source)
+        return {"ok": True, "skill": skill_metadata_dict(metadata)}
+
+    def remove_skill(self, repo: str | Path, name: str) -> dict[str, Any]:
+        root = _validate_repository(repo)
+        RepositorySkillStore(root).remove(name)
+        return {"ok": True, "removed": name}
+
+    @staticmethod
+    def _validate_selected_skills(
+        root: Path,
+        selected_skills: tuple[str, ...] | list[str],
+    ) -> tuple[str, ...]:
+        if not isinstance(selected_skills, (list, tuple)):
+            raise ValueError("Selected skills must be a list")
+        if len(selected_skills) > MAX_SELECTED_SKILLS:
+            raise ValueError(f"Select at most {MAX_SELECTED_SKILLS} skills")
+        registry = RepositorySkillStore(root).catalog().registry
+        normalized: list[str] = []
+        for name in selected_skills:
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("Selected skill names must be non-empty strings")
+            normalized.append(registry.get(name.strip()).metadata.name)
+        return tuple(dict.fromkeys(normalized))
 
     def get_task(self, task_id: str) -> dict[str, Any]:
         with self._tasks_lock:
@@ -230,10 +332,11 @@ class DashboardService:
                     action = task.action
                     prompt = task.prompt
                     approved = task.approved
+                    selected_skills = task.selected_skills
                 result = (
-                    self.planner(prompt, root)
+                    self.planner(prompt, root, selected_skills)
                     if action == "plan"
-                    else self.runner(prompt, root, approved)
+                    else self.runner(prompt, root, approved, selected_skills)
                 )
                 ready = _safe_payload(result)
                 if action == "plan":
@@ -326,6 +429,14 @@ def _loopback_host(host: str) -> bool:
         return False
 
 
+def _string_list(value: Any, field: str) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"{field} must be a list of strings")
+    return tuple(item.strip() for item in value if item.strip())
+
+
 def make_handler(
     service: DashboardService,
     asset_root: Path | None = None,
@@ -379,9 +490,7 @@ def make_handler(
             if not self._request_is_local() or not self._origin_is_safe():
                 self._json_error(HTTPStatus.FORBIDDEN, "Local same-origin requests only")
                 return
-            if urlsplit(self.path).path != "/api/tasks":
-                self._json_error(HTTPStatus.NOT_FOUND, "Not found")
-                return
+            request_path = urlsplit(self.path).path
             if self.headers.get_content_type() != "application/json":
                 self._json_error(
                     HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
@@ -405,16 +514,54 @@ def make_handler(
                 self._json_error(HTTPStatus.BAD_REQUEST, "JSON body must be an object")
                 return
             try:
-                task = service.submit(
-                    str(payload.get("action", "")),
-                    str(payload.get("prompt", "")),
-                    repo=payload.get("repo"),
-                    approved=payload.get("approved") is True,
-                )
-            except (OSError, RuntimeError, SafetyViolation, TypeError, ValueError) as exc:
+                if request_path == "/api/tasks":
+                    response = service.submit(
+                        str(payload.get("action", "")),
+                        str(payload.get("prompt", "")),
+                        repo=payload.get("repo"),
+                        approved=payload.get("approved") is True,
+                        selected_skills=payload.get("skills", ()),
+                    )
+                    status = HTTPStatus.ACCEPTED
+                elif request_path == "/api/picker":
+                    response = service.select_directory(
+                        str(payload.get("purpose", "")),
+                        current=payload.get("current"),
+                    )
+                    status = HTTPStatus.OK
+                elif request_path == "/api/repositories/init":
+                    response = service.initialize(payload.get("repo"))
+                    status = HTTPStatus.OK
+                elif request_path == "/api/skills/create":
+                    response = service.create_skill(payload.get("repo"), payload)
+                    status = HTTPStatus.CREATED
+                elif request_path == "/api/skills/import":
+                    response = service.import_skill(
+                        payload.get("repo"),
+                        payload.get("source", ""),
+                    )
+                    status = HTTPStatus.CREATED
+                elif request_path == "/api/skills/remove":
+                    response = service.remove_skill(
+                        payload.get("repo"),
+                        str(payload.get("name", "")),
+                    )
+                    status = HTTPStatus.OK
+                else:
+                    self._json_error(HTTPStatus.NOT_FOUND, "Not found")
+                    return
+            except (
+                KeyError,
+                NativeDialogError,
+                OSError,
+                RuntimeError,
+                SafetyViolation,
+                TypeError,
+                ValueError,
+            ) as exc:
                 self._json_error(HTTPStatus.BAD_REQUEST, str(exc))
                 return
-            self._json_response(HTTPStatus.ACCEPTED, task)
+            self._json_response(status, response)
 
         def log_message(self, format: str, *args: Any) -> None:
             del format, args

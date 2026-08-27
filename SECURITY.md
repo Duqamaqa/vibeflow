@@ -27,6 +27,16 @@ The autonomous apply layer rejects path traversal, symlink escape, `.git` intern
 
 Vibeflow never commits, pushes, merges, publishes, deploys, or modifies an external repository unless that separate action is explicitly requested and performed outside the autonomous runner.
 
+## Native folder and skill boundary
+
+- The dashboard asks its loopback-only Python backend to open the operating system's native folder chooser. Web pages never receive unrestricted filesystem access.
+- Repository selection accepts local directories, then reports separately whether Git and Vibeflow configuration are ready.
+- Repository setup requires an existing Git repository and creates missing `.ai/` files without overwriting existing content.
+- Skill imports accept a folder containing `SKILL.md`, read only that instruction document, and do not copy or execute scripts, hooks, binaries, or support files.
+- Skill documents must be UTF-8, remain within deterministic size limits, contain valid metadata, avoid symlinks, and pass credential-pattern checks.
+- Installed `.ai/skills/**` paths are protected from autonomous worker changes. Removing a skill is a separate, explicit dashboard action.
+- A high-risk selected skill raises the task's contract risk and therefore requires explicit approval.
+
 ## Before publishing a fork
 
 Run all of these from the repository root:

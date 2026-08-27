@@ -87,6 +87,8 @@ vibeflow web --repo /absolute/path/to/your-project
 
 Your browser opens at **http://127.0.0.1:8765**. Type your request in the large **New task** box.
 
+- Click **Browse…** beside **Target repository** to open the native folder chooser. On macOS this opens Finder. Choose any existing local Git repository.
+- If the selected repository has not used Vibeflow before, click **Set up this repo**. Vibeflow creates only its missing `.ai/` configuration files and never overwrites existing files.
 - **Plan only** explains the contract and route without model inference or file changes.
 - **Run safely** starts the complete coding pipeline.
 - **Approve flagged high-risk scope** approves that task's reviewed scope only. It never approves a commit, push, merge, publish, or deployment.
@@ -121,6 +123,36 @@ Vibeflow is the manager and safety layer; FCC is the connection to AI models.
 
 Vibeflow never automatically commits, pushes, merges, publishes, deploys, or edits protected credential and policy paths.
 
+## Skills: from beginner to professional
+
+You do not need skills to use Vibeflow. A beginner can choose a repository, write the desired outcome, and use the default safe route. Skills become useful when you want Vibeflow to follow a repeatable personal or team standard.
+
+In the dashboard's **Skills** section you can:
+
+- **Create a skill** with a name, plain-language description, trigger phrases, risk level, and reusable instructions.
+- **Import skill folder** and choose an existing folder with the native folder chooser. The folder must contain `SKILL.md`.
+- Select one or more skills for the next plan or autonomous task.
+- Remove a repository skill without affecting your original imported folder.
+
+Skills are stored per project under `.ai/skills/<skill-name>/SKILL.md`, so a professional team can review and commit them like other project instructions. Trigger phrases may select a skill automatically; explicitly checked skills are always included in that task's bounded context.
+
+For supply-chain safety, Vibeflow imports **only** the UTF-8 `SKILL.md` instruction document. It does not copy or execute scripts, binaries, hooks, or other files from the source folder. Symlinks, oversized documents, malformed metadata, and credential-like content are rejected. High-risk skills raise the task risk and require approval.
+
+Minimal compatible skill format:
+
+```markdown
+---
+name: frontend-accessibility
+description: Apply our accessible interface standard
+triggers:
+  - accessibility
+  - frontend
+risk: low
+---
+
+Require visible focus states, semantic labels, keyboard navigation, and regression tests.
+```
+
 ## FCC, ownership, and rights
 
 Vibeflow deliberately keeps FCC outside this repository:
@@ -138,11 +170,13 @@ This separation is intentional: it makes installation and ownership clearer and 
 ## Security and privacy
 
 - The dashboard binds to `127.0.0.1` and refuses public network binding.
+- Repository and skill folder pickers run through the local backend; the browser never receives general filesystem access.
 - It does not store credentials in cookies, URLs, `localStorage`, or `sessionStorage`.
 - Provider credentials remain in FCC's local configuration.
 - Prompts and task evidence are redacted before local task-state persistence.
 - File operations reject path traversal, symlink escape, `.git` internals, secrets, protected paths, and configured denylist matches.
 - Pre-existing dirty files are protected from autonomous overwrites.
+- Imported skills are instruction-only, secret-scanned, size-limited, and protected from autonomous modification.
 - `.env`, private keys, credentials, local task state, and common editor artifacts are excluded by `.gitignore`.
 
 Localhost is not a substitute for operating-system security. Do not expose the dashboard through a tunnel, reverse proxy, shared container, or remote bind. Read [SECURITY.md](SECURITY.md) before connecting providers or publishing a fork.

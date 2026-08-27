@@ -25,6 +25,7 @@
         <button class="nav-item active" type="button" data-scroll="composer"><span>01</span> New task</button>
         <button class="nav-item" type="button" data-scroll="pipeline"><span>02</span> Pipeline</button>
         <button class="nav-item" type="button" data-scroll="evidence"><span>03</span> Evidence</button>
+        <button class="nav-item" type="button" data-scroll="skills"><span>04</span> Skills</button>
       </nav>
 
       <div class="sidebar-spacer"></div>
@@ -51,11 +52,13 @@
           <div class="repo-field">
             <span aria-hidden="true">⌘</span>
             <input id="repo-input" type="text" spellcheck="false" autocomplete="off" aria-describedby="repo-help">
-            <button id="load-repo" class="icon-button" type="button" aria-label="Load repository">↗</button>
+            <button id="browse-repo" class="repo-button" type="button">Browse…</button>
+            <button id="load-repo" class="repo-button quiet" type="button">Load</button>
           </div>
-          <p id="repo-help" class="sr-only">Enter the full path to a local Git repository.</p>
+          <p id="repo-help" class="sr-only">Choose a folder with Finder or enter the full path to a local Git repository.</p>
         </div>
         <div class="topbar-actions">
+          <button id="setup-repo" class="setup-button" type="button" hidden>Set up this repo</button>
           <span id="git-badge" class="quiet-badge">Git · checking</span>
           <button id="refresh-button" class="icon-button" type="button" aria-label="Refresh dashboard">↻</button>
         </div>
@@ -105,6 +108,41 @@
             <div class="model-skeleton"></div><div class="model-skeleton"></div><div class="model-skeleton"></div>
           </div>
           <p class="rail-footnote">The cheapest qualified model starts. Failure or uncertainty escalates—never loops forever.</p>
+        </aside>
+
+        <section class="skills-panel" id="skills" aria-labelledby="skills-title">
+          <div class="panel-heading skills-heading">
+            <div>
+              <p class="eyebrow accent">REUSABLE EXPERTISE</p>
+              <h2 id="skills-title">Bring your own way of working.</h2>
+              <p class="skills-intro">Skills are reusable instructions for design systems, review standards, frameworks, workflows, and team conventions. Select any skill to use it on the next task.</p>
+            </div>
+            <div class="skill-actions">
+              <button id="import-skill" class="secondary-button" type="button">Import skill folder</button>
+              <button id="create-skill" class="primary-button compact" type="button">Create a skill</button>
+            </div>
+          </div>
+          <div class="skill-toolbar">
+            <span id="skill-count">0 skills available</span>
+            <span id="selected-skill-count">0 selected</span>
+          </div>
+          <div id="skill-errors" class="inline-alert" hidden></div>
+          <div id="skill-list" class="skill-list" aria-live="polite"></div>
+          <div id="empty-skills" class="empty-skills">
+            <strong>No skills yet.</strong>
+            <span>Create one in plain language or import a folder containing <code>SKILL.md</code>.</span>
+          </div>
+        </section>
+
+        <aside class="skill-guide" aria-labelledby="skill-guide-title">
+          <p class="eyebrow">BEGINNER → PRO</p>
+          <h2 id="skill-guide-title">Start simple.<br>Grow without switching tools.</h2>
+          <ol>
+            <li><span>01</span><p><strong>Beginner</strong>Write the outcome and let the default route work.</p></li>
+            <li><span>02</span><p><strong>Builder</strong>Create reusable instructions for repeated work.</p></li>
+            <li><span>03</span><p><strong>Professional</strong>Import reviewed skill files and select them per task.</p></li>
+          </ol>
+          <p class="rail-footnote">For safety, Vibeflow imports the reviewed <code>SKILL.md</code> instructions only. It never runs scripts from an imported folder.</p>
         </aside>
 
         <section class="pipeline-panel" id="pipeline" aria-labelledby="pipeline-title">
@@ -173,6 +211,30 @@
       </footer>
     </main>
   </div>
+  <dialog id="skill-dialog" class="skill-dialog" aria-labelledby="skill-dialog-title">
+    <form id="skill-form" method="dialog">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow accent">NEW REUSABLE SKILL</p>
+          <h2 id="skill-dialog-title">Teach Vibeflow your standard.</h2>
+        </div>
+        <button id="close-skill-dialog" class="icon-button" type="button" aria-label="Close skill dialog">×</button>
+      </div>
+      <p class="dialog-intro">A skill is not code. It is a trusted instruction set that Vibeflow adds to selected tasks.</p>
+      <div class="form-grid">
+        <label><span>Name</span><input id="skill-name" name="name" required maxlength="64" placeholder="frontend-accessibility"></label>
+        <label><span>Description</span><input id="skill-description" name="description" required maxlength="240" placeholder="Build accessible interfaces that meet our UI standard"></label>
+        <label class="full"><span>Use when the prompt mentions</span><input id="skill-triggers" name="triggers" placeholder="accessibility, frontend, aria"></label>
+        <label><span>Cost level</span><select id="skill-cost" name="cost"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+        <label><span>Risk level</span><select id="skill-risk" name="risk"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+        <label class="full"><span>Instructions</span><textarea id="skill-instructions" name="instructions" required maxlength="200000" rows="10" placeholder="Describe the rules, workflow, quality bar, and expected output…"></textarea></label>
+      </div>
+      <div class="dialog-actions">
+        <button id="cancel-skill" class="secondary-button" type="button">Cancel</button>
+        <button class="primary-button" type="submit"><span>Save skill</span><span aria-hidden="true">→</span></button>
+      </div>
+    </form>
+  </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="/assets/app.js" defer></script>
 </body>

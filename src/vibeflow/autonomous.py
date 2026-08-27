@@ -39,6 +39,7 @@ class AutonomousRunner:
         *,
         context_files: Iterable[str] = (),
         approved: bool = False,
+        selected_skills: Iterable[str] = (),
     ) -> TaskResult:
         started = time.monotonic()
         routing_path = self.repo_root / ".ai" / "routing.toml"
@@ -56,6 +57,7 @@ class AutonomousRunner:
         plan = orchestrator.plan_task(
             goal,
             context_files=context_files,
+            selected_skills=selected_skills,
             **plan_options,
         )
         if plan.contract.requires_user_approval() and not approved:
@@ -74,6 +76,7 @@ class AutonomousRunner:
                     context_files,
                 )
                 plan = replace(plan, context=context)
+                plan = orchestrator.prepare_skills(plan)
                 resolver = Resolver(
                     self.fcc_client,
                     workspace_context_manager,

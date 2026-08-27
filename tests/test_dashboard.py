@@ -1,6 +1,7 @@
 import http.client
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import threading
 import time
@@ -11,6 +12,7 @@ from src.vibeflow.dashboard import (
     create_server,
 )
 from src.vibeflow.safety import SafetyViolation
+from src.vibeflow.skills import RepositorySkillStore
 
 
 class FakeFCC:
@@ -70,10 +72,11 @@ class TestDashboardService(DashboardTestCase):
     def test_plan_runs_in_background_without_live_worker(self):
         service = DashboardService(
             self.repo_root,
-            planner=lambda prompt, root: {
+            planner=lambda prompt, root, skills: {
                 "status": "planned",
                 "goal": prompt,
                 "repo": str(root),
+                "skills": skills,
             },
         )
 
@@ -87,10 +90,11 @@ class TestDashboardService(DashboardTestCase):
         secret = "sk-proj-" + "abcdefghijklmnopqrstuvwxyz"
         service = DashboardService(
             self.repo_root,
-            runner=lambda prompt, root, approved: {
+            runner=lambda prompt, root, approved, skills: {
                 "status": "done",
                 "summary": f"used {secret}",
                 "approved": approved,
+                "skills": skills,
             },
         )
 
@@ -110,7 +114,7 @@ class TestDashboardService(DashboardTestCase):
     def test_status_persistence_failure_does_not_reverse_completed_task(self):
         service = DashboardService(
             self.repo_root,
-            runner=lambda prompt, root, approved: {"status": "done"},
+            runner=lambda prompt, root, approved, skills: {"status": "done"},
         )
         service._write_last_task = lambda *args: (_ for _ in ()).throw(
             OSError("disk unavailable")
@@ -132,13 +136,67 @@ class TestDashboardService(DashboardTestCase):
         with self.assertRaises(ValueError):
             service.submit("run", "x" * 20_001)
 
+    def test_native_picker_returns_selected_repository(self):
+        service = DashboardService(
+            self.repo_root,
+            directory_picker=lambda prompt, initial: self.repo_root,
+        )
+
+        selected = service.select_directory("repository")
+
+        self.assertTrue(selected["selected"])
+        self.assertEqual(selected["path"], str(self.repo_root))
+
+    def test_repository_setup_requires_git_and_creates_missing_config(self):
+        (self.repo_root / ".ai" / "routing.toml").unlink()
+        service = DashboardService(self.repo_root)
+        with self.assertRaises(SafetyViolation):
+            service.initialize()
+        subprocess.run(
+            ["git", "init", str(self.repo_root)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        result = service.initialize()
+
+        self.assertEqual(result["status"], "created")
+        self.assertTrue((self.repo_root / ".ai" / "routing.toml").is_file())
+
+    def test_selected_repository_skill_reaches_planner(self):
+        captured = {}
+        RepositorySkillStore(self.repo_root).create(
+            name="accessibility",
+            description="Apply accessibility checks",
+            instructions="Require labels and keyboard navigation.",
+            triggers=("accessibility",),
+        )
+        service = DashboardService(
+            self.repo_root,
+            planner=lambda prompt, root, skills: captured.update(
+                {"skills": skills}
+            ) or {"status": "planned", "skills": skills},
+        )
+
+        submitted = service.submit(
+            "plan",
+            "Improve the form",
+            selected_skills=["accessibility"],
+        )
+        finished = self.wait_for_task(service, submitted["task_id"])
+
+        self.assertEqual(finished["status"], "planned")
+        self.assertEqual(captured["skills"], ("accessibility",))
+
 
 class TestDashboardHTTP(DashboardTestCase):
     def setUp(self):
         super().setUp()
         self.service = DashboardService(
             self.repo_root,
-            planner=lambda prompt, root: {"goal": prompt, "status": "planned"},
+            planner=lambda prompt, root, skills: {"goal": prompt, "status": "planned"},
+            directory_picker=lambda prompt, initial: self.repo_root,
             fcc_factory=lambda: FakeFCC(True),
         )
         self.server = create_server(
@@ -195,6 +253,37 @@ class TestDashboardHTTP(DashboardTestCase):
         self.assertEqual(get_status, 200)
         self.assertEqual(json.loads(get_body)["result"]["goal"], "Add tests")
 
+    def test_picker_and_skill_create_endpoints(self):
+        headers = {
+            "Content-Type": "application/json",
+            "Origin": f"http://127.0.0.1:{self.port}",
+        }
+        picker_status, _, picker_body = self.request(
+            "POST",
+            "/api/picker",
+            json.dumps({"purpose": "repository", "current": str(self.repo_root)}),
+            headers,
+        )
+        skill_status, _, skill_body = self.request(
+            "POST",
+            "/api/skills/create",
+            json.dumps(
+                {
+                    "repo": str(self.repo_root),
+                    "name": "docs",
+                    "description": "Write clear docs",
+                    "triggers": ["documentation"],
+                    "instructions": "Use plain language.",
+                }
+            ),
+            headers,
+        )
+
+        self.assertEqual(picker_status, 200)
+        self.assertTrue(json.loads(picker_body)["selected"])
+        self.assertEqual(skill_status, 201)
+        self.assertEqual(json.loads(skill_body)["skill"]["name"], "docs")
+
     def test_rejects_cross_origin_post(self):
         body = json.dumps({"action": "run", "prompt": "Change files"})
 
@@ -249,6 +338,9 @@ class TestDashboardAssets(unittest.TestCase):
         javascript = (asset_root / "app.js").read_text(encoding="utf-8")
 
         self.assertIn('label class="sr-only" for="prompt-input"', html)
+        self.assertIn('id="browse-repo"', html)
+        self.assertIn('id="skill-dialog"', html)
+        self.assertIn("Import skill folder", html)
         self.assertIn("prefers-reduced-motion", css)
         self.assertIn("[hidden] { display: none !important; }", css)
         self.assertNotIn("https://", css)
