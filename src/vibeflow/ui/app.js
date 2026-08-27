@@ -14,6 +14,10 @@ const elements = {
   browseRepo: document.querySelector("#browse-repo"),
   loadRepo: document.querySelector("#load-repo"),
   setupRepo: document.querySelector("#setup-repo"),
+  setupRepoInline: document.querySelector("#setup-repo-inline"),
+  repoSetupNotice: document.querySelector("#repo-setup-notice"),
+  repoSetupTitle: document.querySelector("#repo-setup-title"),
+  repoSetupCopy: document.querySelector("#repo-setup-copy"),
   refresh: document.querySelector("#refresh-button"),
   promptForm: document.querySelector("#prompt-form"),
   promptInput: document.querySelector("#prompt-input"),
@@ -94,6 +98,7 @@ function setBusy(busy) {
     elements.browseRepo,
     elements.loadRepo,
     elements.setupRepo,
+    elements.setupRepoInline,
     elements.importSkill,
     elements.createSkill,
   ]) {
@@ -120,7 +125,7 @@ async function loadBootstrap(repo = "") {
     renderModels(payload.routing);
     renderEngines(payload.engines || []);
     renderSkills(payload.skills || { items: [], errors: [] });
-    elements.setupRepo.hidden = !(payload.setup_required && payload.git && payload.git.is_repository);
+    renderRepositorySetup(payload);
     const liveTask = payload.tasks.find((task) => ["queued", "running"].includes(task.status));
     if (liveTask) {
       state.task = liveTask;
@@ -160,6 +165,28 @@ function renderSystem(payload) {
   } else {
     elements.gitBadge.textContent = "Git · clean";
     elements.gitBadge.className = "quiet-badge clean";
+  }
+}
+
+function repositoryNeedsSetup(payload = state.bootstrap) {
+  return Boolean(payload && (payload.setup_required || !(payload.git && payload.git.is_repository)));
+}
+
+function renderRepositorySetup(payload) {
+  const needsSetup = repositoryNeedsSetup(payload);
+  const gitReady = payload.git && payload.git.is_repository;
+  elements.setupRepo.hidden = !needsSetup;
+  elements.repoSetupNotice.hidden = !needsSetup;
+  const label = gitReady ? "Set up Vibeflow" : "Prepare this folder";
+  elements.setupRepo.textContent = label;
+  elements.setupRepoInline.textContent = label;
+  if (!needsSetup) return;
+  if (gitReady) {
+    elements.repoSetupTitle.textContent = "Add Vibeflow settings before your first task.";
+    elements.repoSetupCopy.textContent = "This creates the missing .ai configuration files only. Existing project files are not overwritten.";
+  } else {
+    elements.repoSetupTitle.textContent = "Prepare this folder before your first task.";
+    elements.repoSetupCopy.textContent = "Vibeflow will create local Git tracking and its .ai settings. It will not commit, push, publish, or change your existing project files.";
   }
 }
 
@@ -283,6 +310,11 @@ function updateSelectedSkillCount() {
 }
 
 async function submitTask(action) {
+  if (repositoryNeedsSetup()) {
+    elements.repoSetupNotice.scrollIntoView({ behavior: "smooth", block: "center" });
+    showToast("Prepare this folder before running a task.", true);
+    return;
+  }
   const prompt = elements.promptInput.value.trim();
   if (!prompt) {
     elements.promptInput.focus();
@@ -400,6 +432,9 @@ function explainTaskFailure(task) {
 
   if (status === "needs-approval") {
     return { stageIndex: 0, reason, action: "Review the requested scope, enable the approval checkbox near your prompt, and run the task again." };
+  }
+  if (normalized.includes("routing config is missing") || normalized.includes(".ai/routing.toml")) {
+    return { stageIndex: 1, reason, action: "Use Prepare this folder near the prompt. Vibeflow will create the missing local setup, then you can retry." };
   }
   if (normalized.includes("fcc") || normalized.includes("model") || normalized.includes("provider") || normalized.includes("route")) {
     return { stageIndex: 1, reason, action: "Check that FCC is running and that the configured model provider is connected, then retry." };
@@ -560,12 +595,13 @@ async function browseRepository() {
 async function setupRepository() {
   setBusy(true);
   try {
+    const initializeGit = !(state.bootstrap && state.bootstrap.git && state.bootstrap.git.is_repository);
     const result = await api("/api/repositories/init", {
       method: "POST",
-      body: JSON.stringify({ repo: state.repo }),
+      body: JSON.stringify({ repo: state.repo, initialize_git: initializeGit }),
     });
     await loadBootstrap(state.repo);
-    showToast(result.status === "created" ? "Repository is ready for Vibeflow." : "Repository was already ready.");
+    showToast(result.git_initialized ? "Git and Vibeflow setup are ready." : result.status === "created" ? "Repository is ready for Vibeflow." : "Repository was already ready.");
   } catch (error) {
     showToast(error.message, true);
   } finally {
@@ -676,6 +712,7 @@ elements.promptInput.addEventListener("keydown", (event) => {
 elements.loadRepo.addEventListener("click", () => loadBootstrap(elements.repoInput.value.trim()));
 elements.browseRepo.addEventListener("click", browseRepository);
 elements.setupRepo.addEventListener("click", setupRepository);
+elements.setupRepoInline.addEventListener("click", setupRepository);
 elements.repoInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") loadBootstrap(elements.repoInput.value.trim());
 });

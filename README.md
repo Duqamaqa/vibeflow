@@ -87,8 +87,9 @@ vibeflow web --repo /absolute/path/to/your-project
 
 Your browser opens at **http://127.0.0.1:8765**. Type your request in the large **New task** box.
 
-- Click **Browse…** beside **Target repository** to open the native folder chooser. On macOS this opens Finder. Choose any existing local Git repository.
-- If the selected repository has not used Vibeflow before, click **Set up this repo**. Vibeflow creates only its missing `.ai/` configuration files and never overwrites existing files.
+- Click **Browse…** beside **Target repository** to open the native folder chooser. On macOS this opens Finder. Choose an existing Git repository or a project folder that you want Vibeflow to prepare.
+- If the selected folder is not ready, use the prominent **Prepare this folder** action before writing a task. With one explicit click, Vibeflow creates local Git tracking when missing plus its `.ai/` configuration. It does not alter existing project files, create a commit, or push anything.
+- **Plan only** and **Run safely** stay blocked until the selected folder has the minimum safe setup, so a missing `.ai/routing.toml` cannot become a confusing failed task.
 - **Plan only** explains the contract and route without model inference or file changes.
 - **Run safely** starts the complete coding pipeline.
 - **Approve flagged high-risk scope** approves that task's reviewed scope only. It never approves a commit, push, merge, publish, or deployment.

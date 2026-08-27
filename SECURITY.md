@@ -31,7 +31,7 @@ Vibeflow never commits, pushes, merges, publishes, deploys, or modifies an exter
 
 - The dashboard asks its loopback-only Python backend to open the operating system's native folder chooser. Web pages never receive unrestricted filesystem access.
 - Repository selection accepts local directories, then reports separately whether Git and Vibeflow configuration are ready.
-- Repository setup requires an existing Git repository and creates missing `.ai/` files without overwriting existing content.
+- Repository setup creates missing `.ai/` files without overwriting existing content. For a non-Git project folder, the dashboard can run fixed-argument `git init` only after the user explicitly clicks **Prepare this folder**; it creates no commit, remote, push, hook, or network request.
 - Skill imports accept a folder containing `SKILL.md`, read only that instruction document, and do not copy or execute scripts, hooks, binaries, or support files.
 - Skill documents must be UTF-8, remain within deterministic size limits, contain valid metadata, avoid symlinks, and pass credential-pattern checks.
 - Installed `.ai/skills/**` paths are protected from autonomous worker changes. Removing a skill is a separate, explicit dashboard action.

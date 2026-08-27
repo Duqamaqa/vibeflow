@@ -1,7 +1,6 @@
 import http.client
 import json
 from pathlib import Path
-import subprocess
 import tempfile
 import threading
 import time
@@ -155,16 +154,12 @@ class TestDashboardService(DashboardTestCase):
         service = DashboardService(self.repo_root)
         with self.assertRaises(SafetyViolation):
             service.initialize()
-        subprocess.run(
-            ["git", "init", str(self.repo_root)],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
 
-        result = service.initialize()
+        result = service.initialize(initialize_git=True)
 
         self.assertEqual(result["status"], "created")
+        self.assertTrue(result["git_initialized"])
+        self.assertTrue((self.repo_root / ".git").is_dir())
         self.assertTrue((self.repo_root / ".ai" / "routing.toml").is_file())
 
     def test_selected_repository_skill_reaches_planner(self):
@@ -345,6 +340,8 @@ class TestDashboardAssets(unittest.TestCase):
         self.assertIn('id="skill-dialog"', html)
         self.assertIn('id="engine-list"', html)
         self.assertIn('id="task-alert"', html)
+        self.assertIn('id="repo-setup-notice"', html)
+        self.assertIn("Prepare this folder", html)
         self.assertIn("Show full details", html)
         self.assertIn("Built in—nothing to import", html)
         self.assertIn("Import skill folder", html)
@@ -355,6 +352,8 @@ class TestDashboardAssets(unittest.TestCase):
         self.assertNotIn("sessionStorage", javascript)
         self.assertIn('skills: [...state.selectedSkills]', javascript)
         self.assertIn("function explainTaskFailure(task)", javascript)
+        self.assertIn("function repositoryNeedsSetup", javascript)
+        self.assertIn("initialize_git: initializeGit", javascript)
         self.assertIn('status === "blocked" ? "stopped safely"', javascript)
 
 

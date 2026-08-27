@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import ipaddress
 import json
 from pathlib import Path
+import subprocess
 import threading
 import time
 from typing import Any, Callable, Mapping, TextIO
@@ -321,17 +322,42 @@ class DashboardService:
         path = _validate_repository(selected)
         return {"ok": True, "selected": True, "path": str(path)}
 
-    def initialize(self, repo: str | Path | None = None) -> dict[str, Any]:
+    def initialize(
+        self,
+        repo: str | Path | None = None,
+        *,
+        initialize_git: bool = False,
+    ) -> dict[str, Any]:
         root = _validate_repository(repo or self.repo_root)
         dirty_state = SafetyGuard(root).dirty_state()
+        git_initialized = False
         if not dirty_state.is_repository:
-            raise SafetyViolation("Choose an existing Git repository before setup")
+            if not initialize_git:
+                raise SafetyViolation(
+                    "This folder is not a Git repository. Use Prepare this folder to create local Git tracking first."
+                )
+            completed = subprocess.run(
+                ["git", "init", "--quiet", str(root)],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=False,
+                shell=False,
+            )
+            if completed.returncode != 0:
+                raise SafetyViolation(
+                    f"Git initialization failed: {completed.stderr.strip() or 'unknown error'}"
+                )
+            if not SafetyGuard(root).dirty_state().is_repository:
+                raise SafetyViolation("Git initialization did not create a usable repository")
+            git_initialized = True
         config_path, created = initialize_repository(root)
         return {
             "ok": True,
             "repo_root": str(root),
             "config_path": str(config_path),
             "created": [str(path.relative_to(root)) for path in created],
+            "git_initialized": git_initialized,
             "status": "created" if created else "already-ready",
         }
 
@@ -604,7 +630,10 @@ def make_handler(
                     )
                     status = HTTPStatus.OK
                 elif request_path == "/api/repositories/init":
-                    response = service.initialize(payload.get("repo"))
+                    response = service.initialize(
+                        payload.get("repo"),
+                        initialize_git=payload.get("initialize_git") is True,
+                    )
                     status = HTTPStatus.OK
                 elif request_path == "/api/skills/create":
                     response = service.create_skill(payload.get("repo"), payload)
