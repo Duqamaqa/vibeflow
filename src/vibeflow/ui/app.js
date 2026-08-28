@@ -63,6 +63,8 @@ const elements = {
   taskCompleteMeta: document.querySelector("#task-complete-meta"),
   viewFinishedOutput: document.querySelector("#view-finished-output"),
   evidencePanel: document.querySelector("#evidence"),
+  evidenceKicker: document.querySelector("#evidence-kicker"),
+  evidenceTitle: document.querySelector("#evidence-title"),
   emptyEvidence: document.querySelector("#empty-evidence"),
   evidenceContent: document.querySelector("#evidence-content"),
   summaryTab: document.querySelector("#summary-tab"),
@@ -392,6 +394,8 @@ function resetEvidence() {
   elements.emptyEvidence.hidden = false;
   elements.evidenceContent.hidden = true;
   elements.copyOutput.disabled = true;
+  elements.evidenceKicker.textContent = "FINISHED TASK OUTPUT";
+  elements.evidenceTitle.textContent = "Your result, files, checks, and code";
   resetPipeline();
 }
 
@@ -467,6 +471,14 @@ function explainTaskFailure(task) {
   if (status === "needs-approval") {
     return { stageIndex: 0, reason, action: "Review the requested scope, enable the approval checkbox near your prompt, and run the task again." };
   }
+  if (normalized.includes("live web research") || normalized.includes("browser/research backend")) {
+    return {
+      stageIndex: 1,
+      reason,
+      action: "Vibeflow cannot safely invent prospects or contact details. First provide a verified business list, then ask it to build one website prototype per task. Live research will require a connected browser backend.",
+      kind: "capability",
+    };
+  }
   if (normalized.includes("routing config is missing") || normalized.includes(".ai/routing.toml")) {
     return { stageIndex: 1, reason, action: "Use Prepare this folder near the prompt. Vibeflow will create the missing local setup, then you can retry." };
   }
@@ -493,10 +505,15 @@ function explainTaskFailure(task) {
 
 function showTaskAlert(status, failure) {
   const approval = status === "needs-approval";
+  const capability = failure.kind === "capability";
   elements.taskAlert.hidden = false;
   elements.taskAlert.classList.toggle("needs-approval", approval);
-  elements.taskAlertKicker.textContent = approval ? "YOUR APPROVAL IS NEEDED" : "STOPPED SAFELY";
-  elements.taskAlertTitle.textContent = approval ? "Vibeflow paused before making changes." : "Vibeflow did not apply unverified changes.";
+  elements.taskAlertKicker.textContent = approval ? "YOUR APPROVAL IS NEEDED" : capability ? "RESEARCH CONNECTION NEEDED" : "STOPPED SAFELY";
+  elements.taskAlertTitle.textContent = approval
+    ? "Vibeflow paused before making changes."
+    : capability
+      ? "Live web research is not connected."
+      : "Vibeflow did not apply unverified changes.";
   elements.taskAlertReason.textContent = failure.reason;
   elements.taskAlertAction.textContent = `Next step: ${failure.action}`;
 }
@@ -532,6 +549,14 @@ function renderEvidence(result, error, task) {
   const duration = data.duration_seconds == null ? "—" : `${Number(data.duration_seconds).toFixed(2)}s`;
   const verificationState = verification.accepted === true ? "Passed" : verification.accepted === false ? "Failed" : task.action === "plan" ? "Not run" : "—";
   const reviewState = review.approved === true ? "Passed" : review.approved === false ? "Failed" : task.action === "plan" ? "Not run" : "—";
+  const stopped = task.status === "blocked";
+  const approval = task.status === "needs-approval";
+  elements.evidenceKicker.textContent = approval ? "TASK PAUSED" : stopped ? "TASK STOPPED SAFELY" : "FINISHED TASK OUTPUT";
+  elements.evidenceTitle.textContent = approval
+    ? "Approval is needed before anything changes"
+    : stopped
+      ? "Why Vibeflow stopped and what to do next"
+      : "Your result, files, checks, and code";
 
   const grid = document.createElement("div");
   grid.className = "summary-grid";
@@ -554,7 +579,9 @@ function renderEvidence(result, error, task) {
 
   elements.summaryTab.replaceChildren(grid);
   addSummarySection("Outcome", error || data.blocker || resolution.blocker || worker.summary || review.feedback || (task.action === "plan" ? "Plan prepared without changing files." : "Task completed."));
-  addSummarySection("Reviewer", reviewState + (review.feedback ? ` — ${review.feedback}` : ""));
+  if (typeof review.approved === "boolean") {
+    addSummarySection("Reviewer", reviewState + (review.feedback ? ` — ${review.feedback}` : ""));
+  }
   addSummarySection("Skills", (data.skills || task.selected_skills || []).join(", ") || "No reusable skills selected.");
   if (changedFiles.length) addFilesSection(changedFiles);
   const contract = data.contract;

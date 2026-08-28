@@ -7,7 +7,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.vibeflow.autonomous import AutonomousRunner, _infer_plan_options
+from src.vibeflow.autonomous import (
+    AutonomousRunner,
+    _infer_plan_options,
+    _requires_live_web_research,
+)
 from src.vibeflow.changes import ApplyResult
 from src.vibeflow.fcc_client import FCCTransportError
 from src.vibeflow.resolver import ResolutionStatus, ResolverResult
@@ -19,6 +23,11 @@ from src.vibeflow.worker import WorkerResult
 class FakeFCC:
     def list_models(self):
         return {"data": []}
+
+
+class UnexpectedFCC:
+    def list_models(self):
+        raise AssertionError("research preflight must not call a model provider")
 
 
 class FakeWorkspace:
@@ -120,6 +129,39 @@ class PipelineFCC:
 
 
 class TestAutonomousSkills(unittest.TestCase):
+    def test_live_web_research_is_detected_before_model_execution(self):
+        self.assertTrue(
+            _requires_live_web_research(
+                "Search the web and find restaurants without websites"
+            )
+        )
+        options = _infer_plan_options("Search the web and find restaurants")
+        self.assertEqual(options["task_type"], "research")
+
+    def test_live_web_research_stops_immediately_without_fabrication(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / ".ai").mkdir()
+            (root / ".ai" / "routing.toml").write_text(
+                """[tiers.cheap]
+model = "provider/cheap"
+[tiers.standard]
+model = "provider/standard"
+[tiers.strong]
+model = "provider/strong"
+""",
+                encoding="utf-8",
+            )
+
+            result = AutonomousRunner(root, fcc_client=UnexpectedFCC()).run(
+                "Search the web and find restaurants without websites"
+            )
+
+            self.assertFalse(result.success)
+            self.assertEqual(result.plan.contract.task_type, "research")
+            self.assertIn("Live web research is not configured", result.blocker)
+            self.assertIn("No information was fabricated", result.blocker)
+            self.assertLess(result.duration_seconds, 1.0)
     def test_folder_description_is_classified_as_documentation(self):
         options = _infer_plan_options("Write a description of the folder for visitors")
 

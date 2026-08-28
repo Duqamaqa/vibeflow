@@ -2,6 +2,12 @@ import unittest
 from vibeflow.contracts import ApprovalState, Contract, contract_from_request
 
 class TestContract(unittest.TestCase):
+    def test_research_contract_requires_verified_non_fabricated_evidence(self):
+        contract = contract_from_request("Find prospects", task_type="research")
+
+        self.assertIn("live, attributable evidence", contract.acceptance_criteria[0])
+        self.assertIn("does not fabricate", contract.acceptance_criteria[0])
+
     def test_contract_creation(self):
         contract = Contract(
             goal="Test goal",

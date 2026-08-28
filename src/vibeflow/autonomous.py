@@ -43,9 +43,15 @@ class AutonomousRunner:
     ) -> TaskResult:
         started = time.monotonic()
         routing_path = self.repo_root / ".ai" / "routing.toml"
-        live_models = self.fcc_client.list_models()
-        resolved_models = resolve_tier_models(routing_path, live_models)
-        router = Router(routing_path, model_overrides=resolved_models)
+        plan_options = _infer_plan_options(goal)
+        needs_live_research = _requires_live_web_research(goal)
+        resolved_models = None
+        if needs_live_research:
+            router = Router(routing_path)
+        else:
+            live_models = self.fcc_client.list_models()
+            resolved_models = resolve_tier_models(routing_path, live_models)
+            router = Router(routing_path, model_overrides=resolved_models)
         context_manager = ContextManager(self.repo_root)
         orchestrator = Orchestrator(
             self.fcc_client,
@@ -53,13 +59,20 @@ class AutonomousRunner:
             router=router,
             max_resolver_iterations=self.max_iterations,
         )
-        plan_options = _infer_plan_options(goal)
         plan = orchestrator.plan_task(
             goal,
             context_files=context_files,
             selected_skills=selected_skills,
             **plan_options,
         )
+        if needs_live_research:
+            return self._blocked_result(
+                plan,
+                started,
+                "Live web research is not configured. Vibeflow cannot verify businesses, "
+                "website ownership, customer demand, or contact details without a connected "
+                "browser/research backend. No information was fabricated and no files were changed.",
+            )
         if plan.contract.requires_user_approval() and not approved:
             return TaskResult(
                 TaskStatus.NEEDS_APPROVAL,
@@ -187,7 +200,9 @@ def _infer_plan_options(goal: str) -> dict[str, object]:
         "agent debate",
     )
     risk = Risk.HIGH if any(term in normalized for term in high_risk_terms) else Risk.LOW
-    if any(term in normalized for term in ("architecture", "security", "migration")):
+    if _requires_live_web_research(goal):
+        task_type = "research"
+    elif any(term in normalized for term in ("architecture", "security", "migration")):
         task_type = "architecture" if "architecture" in normalized else "security"
     elif any(
         term in normalized
@@ -218,3 +233,22 @@ def _infer_plan_options(goal: str) -> dict[str, object]:
         "complexity": complexity,
         "uncertainty": 8 if high_uncertainty else 0,
     }
+
+
+def _requires_live_web_research(goal: str) -> bool:
+    normalized = goal.lower()
+    return any(
+        term in normalized
+        for term in (
+            "search the web",
+            "search online",
+            "browse the web",
+            "look online",
+            "find businesses",
+            "find shops",
+            "find restaurants",
+            "find contact details",
+            "find their email",
+            "find their whatsapp",
+        )
+    )

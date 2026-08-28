@@ -175,6 +175,7 @@ This separation is intentional: it makes installation and ownership clearer and 
 ## Security and privacy
 
 - The dashboard binds to `127.0.0.1` and refuses public network binding.
+- Vibeflow currently edits code; it does not have a live web-research connection. Requests to discover businesses, verify website ownership, or collect contact details stop before model inference instead of inventing information. Provide verified source material first, then ask Vibeflow to build or change code from it.
 - Repository and skill folder pickers run through the local backend; the browser never receives general filesystem access.
 - It does not store credentials in cookies, URLs, `localStorage`, or `sessionStorage`.
 - Provider credentials remain in FCC's local configuration.

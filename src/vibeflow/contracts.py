@@ -151,7 +151,12 @@ def contract_from_request(
         full_goal = f"{full_goal}\n\n{description.strip()}"
     criteria = _strings(acceptance_criteria)
     if full_goal and not criteria and ambiguity == Ambiguity.LOW and risk == Risk.LOW:
-        criteria = ["The requested outcome is implemented and deterministic verification passes."]
+        if task_type == "research":
+            criteria = [
+                "The analysis uses live, attributable evidence and does not fabricate facts or contacts."
+            ]
+        else:
+            criteria = ["The requested outcome is implemented and deterministic verification passes."]
     return Contract(
         goal=full_goal,
         constraints=_strings(constraints),
