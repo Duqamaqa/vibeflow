@@ -227,8 +227,15 @@ class TestDashboardHTTP(DashboardTestCase):
         self.assertEqual(status, 200)
         self.assertIn(b"YOUR DAILY CODING FRONT DOOR", body)
         self.assertIn(b"prompt-input", body)
+        self.assertIn(b"FINISHED OUTPUT READY", body)
+        self.assertIn(b"Your result, files, checks, and code", body)
         self.assertIn("frame-ancestors 'none'", headers["Content-Security-Policy"])
         self.assertEqual(headers["X-Frame-Options"], "DENY")
+
+        script_status, _, script = self.request("GET", "/assets/app.js")
+        self.assertEqual(script_status, 200)
+        self.assertIn(b'pipelinePanel.scrollIntoView', script)
+        self.assertIn(b'viewFinishedOutput', script)
 
     def test_submit_and_poll_plan_task(self):
         body = json.dumps(

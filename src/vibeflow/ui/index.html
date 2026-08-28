@@ -24,7 +24,7 @@
       <nav class="primary-nav" aria-label="Primary navigation">
         <button class="nav-item active" type="button" data-scroll="composer"><span>01</span> New task</button>
         <button class="nav-item" type="button" data-scroll="pipeline"><span>02</span> Pipeline</button>
-        <button class="nav-item" type="button" data-scroll="evidence"><span>03</span> Evidence</button>
+        <button class="nav-item" type="button" data-scroll="evidence"><span>03</span> Output</button>
         <button class="nav-item" type="button" data-scroll="skills"><span>04</span> Skills</button>
       </nav>
 
@@ -198,25 +198,37 @@
               <button id="view-task-details" class="text-button task-alert-button" type="button">Show full details ↓</button>
             </div>
           </div>
+          <div id="task-complete" class="task-complete" role="status" aria-live="polite" hidden>
+            <div class="task-complete-mark" aria-hidden="true">✓</div>
+            <div>
+              <p class="task-complete-kicker">FINISHED OUTPUT READY</p>
+              <h3 id="task-complete-title">Task finished. Your output is ready.</h3>
+              <p id="task-complete-summary" class="task-complete-summary"></p>
+              <p id="task-complete-meta" class="task-complete-meta"></p>
+              <button id="view-finished-output" class="primary-button compact task-complete-button" type="button">
+                <span>View finished output</span><span aria-hidden="true">↓</span>
+              </button>
+            </div>
+          </div>
         </section>
 
         <section class="evidence-panel" id="evidence" aria-labelledby="evidence-title">
           <div class="panel-heading evidence-heading">
             <div>
-              <p class="eyebrow">TASK EVIDENCE</p>
-              <h2 id="evidence-title">What actually happened</h2>
+              <p class="eyebrow accent">FINISHED TASK OUTPUT</p>
+              <h2 id="evidence-title">Your result, files, checks, and code</h2>
             </div>
-            <button id="copy-output" class="text-button" type="button" disabled>Copy summary</button>
+            <button id="copy-output" class="text-button" type="button" disabled>Copy full report</button>
           </div>
-          <div class="tab-list" role="tablist" aria-label="Task evidence">
+          <div class="tab-list" role="tablist" aria-label="Finished task output">
             <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="summary">Summary</button>
-            <button class="tab" type="button" role="tab" aria-selected="false" data-tab="diff">Diff</button>
+            <button class="tab" type="button" role="tab" aria-selected="false" data-tab="diff">Changed code</button>
             <button class="tab" type="button" role="tab" aria-selected="false" data-tab="raw">Full report</button>
           </div>
           <div id="empty-evidence" class="empty-evidence">
             <span class="empty-glyph" aria-hidden="true">⌁</span>
-            <h3>Evidence lands here.</h3>
-            <p>Run or plan a task to see routing, changed files, verification, reviewer judgment, and the generated diff.</p>
+            <h3>Your finished output appears here.</h3>
+            <p>After the pipeline finishes, this area shows the result summary, changed files, verification, reviewer judgment, and generated code diff.</p>
           </div>
           <div id="evidence-content" class="evidence-content" hidden>
             <div id="summary-tab" class="tab-panel"></div>

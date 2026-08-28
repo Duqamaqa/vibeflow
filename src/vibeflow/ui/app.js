@@ -55,7 +55,14 @@ const elements = {
   taskAlertReason: document.querySelector("#task-alert-reason"),
   taskAlertAction: document.querySelector("#task-alert-action"),
   viewTaskDetails: document.querySelector("#view-task-details"),
+  pipelinePanel: document.querySelector("#pipeline"),
   pipelineSteps: [...document.querySelectorAll("#pipeline-steps li")],
+  taskComplete: document.querySelector("#task-complete"),
+  taskCompleteTitle: document.querySelector("#task-complete-title"),
+  taskCompleteSummary: document.querySelector("#task-complete-summary"),
+  taskCompleteMeta: document.querySelector("#task-complete-meta"),
+  viewFinishedOutput: document.querySelector("#view-finished-output"),
+  evidencePanel: document.querySelector("#evidence"),
   emptyEvidence: document.querySelector("#empty-evidence"),
   evidenceContent: document.querySelector("#evidence-content"),
   summaryTab: document.querySelector("#summary-tab"),
@@ -323,6 +330,12 @@ async function submitTask(action) {
   }
   setBusy(true);
   resetPipeline();
+  elements.statusBadge.textContent = action === "plan" ? "starting plan" : "starting safely";
+  elements.statusBadge.className = "status-pill running";
+  markStep(elements.pipelineSteps[0], "active", "•••");
+  window.requestAnimationFrame(() => {
+    elements.pipelinePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
   try {
     const task = await api("/api/tasks", {
       method: "POST",
@@ -368,6 +381,7 @@ function startPolling(taskId) {
 function resetPipeline() {
   elements.taskAlert.hidden = true;
   elements.taskAlert.className = "task-alert";
+  elements.taskComplete.hidden = true;
   for (const step of elements.pipelineSteps) {
     step.className = "";
     step.querySelector(".step-state").textContent = "—";
@@ -401,6 +415,7 @@ function renderTask(task) {
     elements.pipelineSteps.forEach((step, index) => {
       if (index < finishIndex) markStep(step, "complete", "✓");
     });
+    showTaskComplete(task);
   } else {
     const failure = explainTaskFailure(task);
     elements.pipelineSteps.forEach((step, index) => {
@@ -410,6 +425,25 @@ function renderTask(task) {
     showTaskAlert(status, failure);
   }
   renderEvidence(task.result, task.error, task);
+}
+
+function showTaskComplete(task) {
+  const data = task.result || {};
+  const resolution = data.resolution || {};
+  const worker = resolution.worker || {};
+  const review = resolution.review || {};
+  const changedFiles = worker.changed_files || [];
+  const planned = task.action === "plan" || task.status === "planned";
+  elements.taskComplete.hidden = false;
+  elements.taskCompleteTitle.textContent = planned
+    ? "Plan finished. Your output is ready."
+    : "Task finished. Your output is ready.";
+  elements.taskCompleteSummary.textContent = worker.summary || review.feedback || data.summary || (planned
+    ? "Vibeflow prepared the contract and route without changing files."
+    : "Vibeflow completed, verified, reviewed, and safely applied the task.");
+  elements.taskCompleteMeta.textContent = planned
+    ? "No files changed · plan only"
+    : `${changedFiles.length} changed file${changedFiles.length === 1 ? "" : "s"} · verification ${resolution.verification?.accepted === true ? "passed" : "reported"} · review ${review.approved === true ? "passed" : "reported"}`;
 }
 
 function taskFailureText(task) {
@@ -724,6 +758,10 @@ elements.closeSkillDialog.addEventListener("click", closeSkillDialog);
 elements.cancelSkill.addEventListener("click", closeSkillDialog);
 elements.viewTaskDetails.addEventListener("click", () => {
   document.querySelector("#evidence").scrollIntoView({ behavior: "smooth" });
+});
+elements.viewFinishedOutput.addEventListener("click", () => {
+  switchTab("summary");
+  elements.evidencePanel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 elements.tabs.forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
 elements.copyOutput.addEventListener("click", async () => {
