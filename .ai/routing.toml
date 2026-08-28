@@ -7,6 +7,10 @@ model = "open_router/deepseek/deepseek-v4-pro-0813"
 [tiers.strong]
 model = "auto:openai-codex"
 
+[research]
+model = "open_router/google/gemini-3-flash-preview"
+max_results = 8
+
 [policy]
 max_escalations = 2
 target_philosophy = "60/30/10"

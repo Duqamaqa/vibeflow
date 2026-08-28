@@ -20,7 +20,7 @@ import webbrowser
 from .autonomous import AutonomousRunner, _infer_plan_options
 from .context import ContextManager
 from .fcc_client import FCCClient
-from .model_selection import load_routing_preferences
+from .model_selection import load_research_preferences, load_routing_preferences
 from .native_dialog import NativeDialogError, choose_directory
 from .orchestrator import Orchestrator
 from .project_setup import initialize_repository
@@ -56,6 +56,13 @@ BUILTIN_ENGINES: tuple[dict[str, str], ...] = (
         "description": "Chooses cheap, standard, or strong models from task complexity, scope, risk, and failures.",
         "activation": "always-on",
         "when": "Before model work",
+    },
+    {
+        "id": "cited-web-research",
+        "name": "Cited Live Web Research",
+        "description": "Uses a bounded OpenRouter web-search model and keeps attributable source links with the result.",
+        "activation": "automatic",
+        "when": "When your prompt requests live web research",
     },
     {
         "id": "structured-change-gate",
@@ -172,6 +179,7 @@ class DashboardTask:
     repo_root: str
     prompt: str
     approved: bool
+    task_type: str = "implementation"
     selected_skills: tuple[str, ...] = ()
     status: str = "queued"
     stage: str = "queued"
@@ -216,8 +224,12 @@ class DashboardService:
             preferred, alternatives = load_routing_preferences(
                 root / ".ai" / "routing.toml"
             )
+            research_model, research_max_results = load_research_preferences(
+                root / ".ai" / "routing.toml"
+            )
         except (OSError, RuntimeError, ValueError) as exc:
             routing_error = str(exc)
+            research_model, research_max_results = None, None
 
         skill_catalog = RepositorySkillStore(root).catalog()
 
@@ -242,6 +254,10 @@ class DashboardService:
                 "routing": {
                     "tiers": preferred,
                     "alternatives": alternatives,
+                    "research": {
+                        "model": research_model,
+                        "max_results": research_max_results,
+                    },
                     "error": routing_error,
                 },
                 "setup_required": not (root / ".ai" / "routing.toml").is_file(),
@@ -286,6 +302,7 @@ class DashboardService:
             repo_root=str(root),
             prompt=normalized_prompt,
             approved=bool(approved),
+            task_type=str(_infer_plan_options(normalized_prompt)["task_type"]),
             selected_skills=normalized_skills,
             created_at=now,
             updated_at=now,
@@ -425,7 +442,13 @@ class DashboardService:
         repo_lock: threading.Lock,
     ) -> None:
         with repo_lock:
-            self._update_task(task_id, status="running", stage="orchestrating")
+            with self._tasks_lock:
+                task_type = self._tasks[task_id].task_type
+            self._update_task(
+                task_id,
+                status="running",
+                stage="researching" if task_type.startswith("research") else "orchestrating",
+            )
             try:
                 with self._tasks_lock:
                     task = self._tasks[task_id]

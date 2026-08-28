@@ -8,6 +8,16 @@ class TestContract(unittest.TestCase):
         self.assertIn("live, attributable evidence", contract.acceptance_criteria[0])
         self.assertIn("does not fabricate", contract.acceptance_criteria[0])
 
+    def test_combined_research_contract_also_requires_verified_code(self):
+        contract = contract_from_request(
+            "Research a business and build its website",
+            task_type="research-and-implementation",
+        )
+
+        self.assertEqual(len(contract.acceptance_criteria), 2)
+        self.assertIn("live, attributable evidence", contract.acceptance_criteria[0])
+        self.assertIn("deterministic verification", contract.acceptance_criteria[1])
+
     def test_contract_creation(self):
         contract = Contract(
             goal="Test goal",

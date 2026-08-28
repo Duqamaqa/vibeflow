@@ -29,7 +29,7 @@ Vibeflow plans, protects, verifies, and reviews the work
           ↓
 FCC sends model requests to the providers you configured
           ↓
-The accepted file changes return to your local project
+A cited research report and/or accepted file changes return to you
 ```
 
 ### 1. Install FCC first
@@ -50,6 +50,8 @@ Start FCC:
 - **Linux:** run `fcc-server` and keep that terminal open.
 
 FCC opens its local Admin UI. Connect at least one model provider there. For the default Vibeflow routes, connect ChatGPT under **Providers → Connected accounts** and configure NVIDIA NIM and/or OpenRouter if you want those worker tiers. Provider availability, prices, subscriptions, and usage rules are controlled by those providers and may change.
+
+To use live web research, connect **OpenRouter** in FCC. The default research route is `google/gemini-3-flash-preview` with bounded web search. Search and model usage can consume OpenRouter credits.
 
 > [!CAUTION]
 > Put provider keys and connected-account credentials only in FCC's local Admin UI. Never paste keys into the Vibeflow repository, a prompt, a GitHub issue, a screenshot, or a commit.
@@ -91,7 +93,7 @@ Your browser opens at **http://127.0.0.1:8765**. Type your request in the large 
 - If the selected folder is not ready, use the prominent **Prepare this folder** action before writing a task. With one explicit click, Vibeflow creates local Git tracking when missing plus its `.ai/` configuration. It does not alter existing project files, create a commit, or push anything.
 - **Plan only** and **Run safely** stay blocked until the selected folder has the minimum safe setup, so a missing `.ai/routing.toml` cannot become a confusing failed task.
 - **Plan only** explains the contract and route without model inference or file changes.
-- **Run safely** starts the complete coding pipeline.
+- **Run safely** starts cited web research when requested, the complete coding pipeline, or both in sequence.
 - **Approve flagged high-risk scope** approves that task's reviewed scope only. It never approves a commit, push, merge, publish, or deployment.
 
 Keep the terminal window open while using Vibeflow. Press `Ctrl+C` to stop it.
@@ -114,13 +116,14 @@ Vibeflow is the manager and safety layer; FCC is the connection to AI models.
 1. **Understands the request.** Vibeflow turns your prompt into a clear goal, boundaries, and success checklist.
 2. **Stops on risky ambiguity.** Sensitive or unclear work can return `needs-approval` before any model changes files.
 3. **Chooses the right model.** Simple work starts with a lower-cost worker; difficult work can use stronger models.
-4. **Limits what the model sees.** The worker receives relevant project context instead of an uncontrolled copy of everything.
-5. **Accepts only structured changes.** The worker must propose validated create, update, delete, or rename operations—not arbitrary shell instructions.
-6. **Works in isolation.** Vibeflow prepares changes away from your main working copy and protects unrelated uncommitted work.
-7. **Checks the result.** It creates the real Git diff and runs discovered tests, linting, type checks, and builds.
-8. **Uses a fresh reviewer.** A separate strong model sees the task, relevant context, diff, and check results—not the worker's private reasoning.
-9. **Repairs within limits.** Failed review can trigger a bounded repair-and-review loop. It cannot retry forever.
-10. **Returns evidence.** The final state is `done`, `blocked`, or `needs-approval`, with changed files and verification results.
+4. **Researches when asked.** A bounded OpenRouter web-search model returns current findings with public source links. A research-only task does not touch project files.
+5. **Limits what the model sees.** The worker receives relevant project context and cited research instead of an uncontrolled copy of everything.
+6. **Accepts only structured changes.** The worker must propose validated create, update, delete, or rename operations—not arbitrary shell instructions.
+7. **Works in isolation.** Vibeflow prepares changes away from your main working copy and protects unrelated uncommitted work.
+8. **Checks the result.** It creates the real Git diff and runs discovered tests, linting, type checks, and builds.
+9. **Uses a fresh reviewer.** A separate strong model sees the task, relevant context, research, diff, and check results—not the worker's private reasoning.
+10. **Repairs within limits.** Failed review can trigger a bounded repair-and-review loop. It cannot retry forever.
+11. **Returns evidence.** The final state is `done`, `blocked`, or `needs-approval`, with sources, changed files, and verification results.
 
 Vibeflow never automatically commits, pushes, merges, publishes, deploys, or edits protected credential and policy paths.
 
@@ -175,7 +178,8 @@ This separation is intentional: it makes installation and ownership clearer and 
 ## Security and privacy
 
 - The dashboard binds to `127.0.0.1` and refuses public network binding.
-- Vibeflow currently edits code; it does not have a live web-research connection. Requests to discover businesses, verify website ownership, or collect contact details stop before model inference instead of inventing information. Provide verified source material first, then ask Vibeflow to build or change code from it.
+- Live research runs through the OpenRouter provider configured inside FCC. Vibeflow stores no OpenRouter key and rejects research output that contains no safe public source URL.
+- Research sources are evidence, not guarantees. Users must verify website ownership, demand, contact details, licensing, and outreach-law compliance before acting on a lead.
 - Repository and skill folder pickers run through the local backend; the browser never receives general filesystem access.
 - It does not store credentials in cookies, URLs, `localStorage`, or `sessionStorage`.
 - Provider credentials remain in FCC's local configuration.

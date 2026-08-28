@@ -2,7 +2,11 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from vibeflow.model_selection import ModelSelectionError, resolve_tier_models
+from vibeflow.model_selection import (
+    ModelSelectionError,
+    resolve_research_model,
+    resolve_tier_models,
+)
 
 
 class TestModelSelection(unittest.TestCase):
@@ -17,6 +21,9 @@ model = "nvidia_nim/deepseek-ai/deepseek-v4-flash-0731"
 model = "open_router/deepseek/deepseek-v4-pro-0813"
 [tiers.strong]
 model = "auto:openai-codex"
+[research]
+model = "open_router/google/gemini-3-flash-preview"
+max_results = 6
 [candidates]
 cheap = []
 standard = ["open_router/z-ai/glm-5.2"]
@@ -108,6 +115,27 @@ strong = []
                     {"id": "nvidia_nim/deepseek-ai/deepseek-v4-flash-0731"},
                     {"id": "open_router/deepseek/deepseek-v4-pro-0813"},
                 ]},
+            )
+
+    def test_resolves_bounded_non_claude_openrouter_research_model(self):
+        model, max_results = resolve_research_model(
+            self.config,
+            {"data": [{"id": "anthropic/open_router/google/gemini-3-flash-preview"}]},
+        )
+
+        self.assertEqual(model, "open_router/google/gemini-3-flash-preview")
+        self.assertEqual(max_results, 6)
+
+    def test_research_model_must_be_available_through_openrouter(self):
+        self.config.write_text(
+            "[research]\nmodel = \"nvidia_nim/google/gemma-4\"\n",
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(ModelSelectionError, "OpenRouter"):
+            resolve_research_model(
+                self.config,
+                {"data": [{"id": "nvidia_nim/google/gemma-4"}]},
             )
 
 

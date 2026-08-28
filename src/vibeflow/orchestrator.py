@@ -61,6 +61,7 @@ class TaskResult:
     duration_seconds: float
     resolution: ResolverResult | None = None
     blocker: str | None = None
+    research: Any = None
 
     @property
     def success(self) -> bool:
@@ -72,6 +73,7 @@ class TaskResult:
             "success": self.success,
             "duration_seconds": self.duration_seconds,
             "blocker": self.blocker,
+            "research": None if self.research is None else self.research.to_dict(),
             **self.plan.to_dict(),
             "resolution": None if self.resolution is None else self.resolution.to_dict(),
         }

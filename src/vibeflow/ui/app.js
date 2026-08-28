@@ -204,9 +204,10 @@ function renderModels(routing) {
     cheap: ["Mechanical", "Starts here"],
     standard: ["Builder", "Escalation 1"],
     strong: ["CTO / Review", "Final authority"],
+    research: ["Live web", "Cited sources"],
   };
   elements.modelCards.replaceChildren();
-  for (const tier of ["cheap", "standard", "strong"]) {
+  for (const tier of ["cheap", "standard", "strong", "research"]) {
     const card = document.createElement("article");
     card.className = "model-card";
     card.dataset.tier = tier;
@@ -220,8 +221,9 @@ function renderModels(routing) {
     role.textContent = labels[tier][1];
     const name = document.createElement("p");
     name.className = "model-name";
-    name.title = routing.tiers[tier] || "Not configured";
-    name.textContent = routing.tiers[tier] || "Not configured";
+    const model = tier === "research" ? routing.research?.model : routing.tiers[tier];
+    name.title = model || "Not configured";
+    name.textContent = model || "Not configured";
     header.append(tierLabel, role);
     card.append(header, name);
     elements.modelCards.append(card);
@@ -395,30 +397,45 @@ function resetEvidence() {
   elements.evidenceContent.hidden = true;
   elements.copyOutput.disabled = true;
   elements.evidenceKicker.textContent = "FINISHED TASK OUTPUT";
-  elements.evidenceTitle.textContent = "Your result, files, checks, and code";
+  elements.evidenceTitle.textContent = "Your result, sources, files, checks, and code";
   resetPipeline();
 }
 
 function renderTask(task) {
   const status = task.status || "queued";
+  const taskType = task.task_type || task.result?.contract?.task_type || "implementation";
+  const researchOnly = taskType === "research";
+  const usesResearch = taskType.startsWith("research");
   elements.statusBadge.textContent = status === "blocked" ? "stopped safely" : status.replaceAll("-", " ");
   elements.statusBadge.className = `status-pill ${status}`;
   resetPipeline();
   if (["queued", "running"].includes(status)) {
-    const activeIndex = status === "queued" ? 0 : 3;
-    elements.pipelineSteps.forEach((step, index) => {
-      if (index < activeIndex) markStep(step, "complete", "✓");
-      else if (index === activeIndex) markStep(step, "active", "•••");
-    });
+    if (status === "queued") markStep(elements.pipelineSteps[0], "active", "•••");
+    else if (usesResearch) {
+      markStep(elements.pipelineSteps[0], "complete", "✓");
+      markStep(elements.pipelineSteps[1], "complete", "✓");
+      markStep(elements.pipelineSteps[2], "active", "•••");
+    } else {
+      markStep(elements.pipelineSteps[0], "complete", "✓");
+      markStep(elements.pipelineSteps[1], "complete", "✓");
+      markStep(elements.pipelineSteps[3], "complete", "✓");
+      markStep(elements.pipelineSteps[4], "active", "•••");
+    }
     return;
   }
   const planned = task.action === "plan" || status === "planned";
   const success = status === "done" || status === "planned";
   if (success) {
-    const finishIndex = planned ? 3 : 7;
-    elements.pipelineSteps.forEach((step, index) => {
-      if (index < finishIndex) markStep(step, "complete", "✓");
-    });
+    if (planned) {
+      markStep(elements.pipelineSteps[0], "complete", "✓");
+      markStep(elements.pipelineSteps[1], "complete", "✓");
+    } else if (researchOnly) {
+      [0, 1, 2].forEach((index) => markStep(elements.pipelineSteps[index], "complete", "✓"));
+    } else {
+      elements.pipelineSteps.forEach((step, index) => {
+        if (usesResearch || index !== 2) markStep(step, "complete", "✓");
+      });
+    }
     showTaskComplete(task);
   } else {
     const failure = explainTaskFailure(task);
@@ -437,6 +454,8 @@ function showTaskComplete(task) {
   const worker = resolution.worker || {};
   const review = resolution.review || {};
   const changedFiles = worker.changed_files || [];
+  const research = data.research || {};
+  const researchOnly = (task.task_type || data.contract?.task_type) === "research";
   const planned = task.action === "plan" || task.status === "planned";
   elements.taskComplete.hidden = false;
   elements.taskCompleteTitle.textContent = planned
@@ -444,10 +463,12 @@ function showTaskComplete(task) {
     : "Task finished. Your output is ready.";
   elements.taskCompleteSummary.textContent = worker.summary || review.feedback || data.summary || (planned
     ? "Vibeflow prepared the contract and route without changing files."
-    : "Vibeflow completed, verified, reviewed, and safely applied the task.");
+    : research.report || "Vibeflow completed, verified, reviewed, and safely applied the task.");
   elements.taskCompleteMeta.textContent = planned
     ? "No files changed · plan only"
-    : `${changedFiles.length} changed file${changedFiles.length === 1 ? "" : "s"} · verification ${resolution.verification?.accepted === true ? "passed" : "reported"} · review ${review.approved === true ? "passed" : "reported"}`;
+    : researchOnly
+      ? `${(research.sources || []).length} cited source${(research.sources || []).length === 1 ? "" : "s"} · no code changes requested`
+      : `${changedFiles.length} changed file${changedFiles.length === 1 ? "" : "s"} · verification ${resolution.verification?.accepted === true ? "passed" : "reported"} · review ${review.approved === true ? "passed" : "reported"}`;
 }
 
 function taskFailureText(task) {
@@ -471,11 +492,11 @@ function explainTaskFailure(task) {
   if (status === "needs-approval") {
     return { stageIndex: 0, reason, action: "Review the requested scope, enable the approval checkbox near your prompt, and run the task again." };
   }
-  if (normalized.includes("live web research") || normalized.includes("browser/research backend")) {
+  if (normalized.includes("live web research failed") || normalized.includes("web research returned")) {
     return {
-      stageIndex: 1,
+      stageIndex: 2,
       reason,
-      action: "Vibeflow cannot safely invent prospects or contact details. First provide a verified business list, then ask it to build one website prototype per task. Live research will require a connected browser backend.",
+      action: "Check that FCC and OpenRouter are connected, then retry. Vibeflow rejected the result because it lacked safe cited evidence.",
       kind: "capability",
     };
   }
@@ -486,19 +507,19 @@ function explainTaskFailure(task) {
     return { stageIndex: 1, reason, action: "Check that FCC is running and that the configured model provider is connected, then retry." };
   }
   if (normalized.includes("worktree") || normalized.includes("workspace") || normalized.includes("git repository") || normalized.includes("isolate")) {
-    return { stageIndex: 2, reason, action: "Confirm the selected folder is an accessible Git repository, then retry." };
+    return { stageIndex: 3, reason, action: "Confirm the selected folder is an accessible Git repository, then retry." };
   }
   if (worker.success === false || normalized.includes("structured proposal") || normalized.includes("invalid json") || normalized.includes("worker")) {
-    return { stageIndex: 3, reason, action: "The coding model did not return a safe structured change. Retry or let routing escalate to a stronger model." };
+    return { stageIndex: 4, reason, action: "The coding model did not return a safe structured change. Retry or let routing escalate to a stronger model." };
   }
   if (verification.accepted === false || /\b(test|tests|lint|typecheck|verification|build)\b/.test(normalized)) {
-    return { stageIndex: 4, reason, action: "Open the task details to see which deterministic check failed, then ask Vibeflow to fix that failure." };
+    return { stageIndex: 5, reason, action: "Open the task details to see which deterministic check failed, then ask Vibeflow to fix that failure." };
   }
   if (review.approved === false || normalized.includes("review") || normalized.includes("resolver") || normalized.includes("iteration")) {
-    return { stageIndex: 5, reason, action: "The independent reviewer rejected the change and the repair limit was reached. Use its feedback in a new prompt." };
+    return { stageIndex: 6, reason, action: "The independent reviewer rejected the change and the repair limit was reached. Use its feedback in a new prompt." };
   }
   if (normalized.includes("promot") || normalized.includes("apply") || normalized.includes("hash") || normalized.includes("dirty") || normalized.includes("stale")) {
-    return { stageIndex: 6, reason, action: "Your project changed while Vibeflow was working, so safe apply was cancelled. Review local changes and retry." };
+    return { stageIndex: 7, reason, action: "Your project changed while Vibeflow was working, so safe apply was cancelled. Review local changes and retry." };
   }
   return { stageIndex: 1, reason, action: "Open the full details below for the exact technical report. Your project was not changed." };
 }
@@ -508,11 +529,11 @@ function showTaskAlert(status, failure) {
   const capability = failure.kind === "capability";
   elements.taskAlert.hidden = false;
   elements.taskAlert.classList.toggle("needs-approval", approval);
-  elements.taskAlertKicker.textContent = approval ? "YOUR APPROVAL IS NEEDED" : capability ? "RESEARCH CONNECTION NEEDED" : "STOPPED SAFELY";
+  elements.taskAlertKicker.textContent = approval ? "YOUR APPROVAL IS NEEDED" : capability ? "RESEARCH EVIDENCE MISSING" : "STOPPED SAFELY";
   elements.taskAlertTitle.textContent = approval
     ? "Vibeflow paused before making changes."
     : capability
-      ? "Live web research is not connected."
+      ? "Live research could not be verified."
       : "Vibeflow did not apply unverified changes.";
   elements.taskAlertReason.textContent = failure.reason;
   elements.taskAlertAction.textContent = `Next step: ${failure.action}`;
@@ -544,10 +565,12 @@ function renderEvidence(result, error, task) {
   const worker = resolution.worker || {};
   const review = resolution.review || {};
   const verification = resolution.verification || {};
+  const research = data.research || {};
+  const researchOnly = (task.task_type || data.contract?.task_type) === "research";
   const routing = data.routing || resolution.routing || {};
   const changedFiles = worker.changed_files || [];
   const duration = data.duration_seconds == null ? "—" : `${Number(data.duration_seconds).toFixed(2)}s`;
-  const verificationState = verification.accepted === true ? "Passed" : verification.accepted === false ? "Failed" : task.action === "plan" ? "Not run" : "—";
+  const verificationState = verification.accepted === true ? "Passed" : verification.accepted === false ? "Failed" : researchOnly ? "Not needed" : task.action === "plan" ? "Not run" : "—";
   const reviewState = review.approved === true ? "Passed" : review.approved === false ? "Failed" : task.action === "plan" ? "Not run" : "—";
   const stopped = task.status === "blocked";
   const approval = task.status === "needs-approval";
@@ -562,7 +585,7 @@ function renderEvidence(result, error, task) {
   grid.className = "summary-grid";
   const stats = [
     ["Status", task.status || data.status || "—"],
-    ["Route", routing.tier || routing.model || "—"],
+    ["Route", research.model || routing.tier || routing.model || "—"],
     ["Verification", verificationState],
     ["Duration", duration],
   ];
@@ -578,7 +601,8 @@ function renderEvidence(result, error, task) {
   }
 
   elements.summaryTab.replaceChildren(grid);
-  addSummarySection("Outcome", error || data.blocker || resolution.blocker || worker.summary || review.feedback || (task.action === "plan" ? "Plan prepared without changing files." : "Task completed."));
+  addSummarySection("Outcome", error || data.blocker || resolution.blocker || worker.summary || review.feedback || research.report || (task.action === "plan" ? "Plan prepared without changing files." : "Task completed."));
+  if (research.report) addResearchSection(research);
   if (typeof review.approved === "boolean") {
     addSummarySection("Reviewer", reviewState + (review.feedback ? ` — ${review.feedback}` : ""));
   }
@@ -587,7 +611,7 @@ function renderEvidence(result, error, task) {
   const contract = data.contract;
   if (contract && contract.goal) addSummarySection("Contract", contract.goal);
 
-  elements.diffTab.textContent = worker.diff || "No diff was generated for this task.";
+  elements.diffTab.textContent = worker.diff || (researchOnly ? "No code changes were requested for this research task." : "No diff was generated for this task.");
   elements.rawTab.textContent = JSON.stringify(task, null, 2);
   switchTab(state.activeTab);
 }
@@ -617,6 +641,27 @@ function addFilesSection(files) {
     chips.append(chip);
   }
   section.append(heading, chips);
+  elements.summaryTab.append(section);
+}
+
+function addResearchSection(research) {
+  const section = document.createElement("section");
+  section.className = "summary-section";
+  const heading = document.createElement("h3");
+  heading.textContent = `Research sources (${(research.sources || []).length})`;
+  const list = document.createElement("ul");
+  list.className = "research-sources";
+  for (const source of research.sources || []) {
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+    link.href = source.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = source.title || source.url;
+    item.append(link);
+    list.append(item);
+  }
+  section.append(heading, list);
   elements.summaryTab.append(section);
 }
 

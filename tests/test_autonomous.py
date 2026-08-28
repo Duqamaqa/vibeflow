@@ -10,6 +10,7 @@ from unittest.mock import patch
 from src.vibeflow.autonomous import (
     AutonomousRunner,
     _infer_plan_options,
+    _requires_code_changes,
     _requires_live_web_research,
 )
 from src.vibeflow.changes import ApplyResult
@@ -25,9 +26,28 @@ class FakeFCC:
         return {"data": []}
 
 
-class UnexpectedFCC:
+class ResearchFCC:
+    def __init__(self):
+        self.requests = []
+
     def list_models(self):
-        raise AssertionError("research preflight must not call a model provider")
+        return {
+            "data": [
+                {"id": "open_router/google/gemini-3-flash-preview"},
+                {"id": "test/cheap"},
+                {"id": "test/standard"},
+                {"id": "test/strong"},
+            ]
+        }
+
+    def create_response(self, **kwargs):
+        self.requests.append(kwargs)
+        return SimpleNamespace(
+            text="Verified finding from [Official source](https://example.com/source).",
+            raw=[],
+            usage={"input_tokens": 10, "output_tokens": 12},
+            request_id="research-request",
+        )
 
 
 class FakeWorkspace:
@@ -138,7 +158,7 @@ class TestAutonomousSkills(unittest.TestCase):
         options = _infer_plan_options("Search the web and find restaurants")
         self.assertEqual(options["task_type"], "research")
 
-    def test_live_web_research_stops_immediately_without_fabrication(self):
+    def test_live_web_research_returns_cited_report_without_file_changes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / ".ai").mkdir()
@@ -153,15 +173,54 @@ model = "provider/strong"
                 encoding="utf-8",
             )
 
-            result = AutonomousRunner(root, fcc_client=UnexpectedFCC()).run(
+            fcc = ResearchFCC()
+            result = AutonomousRunner(root, fcc_client=fcc).run(
                 "Search the web and find restaurants without websites"
             )
 
-            self.assertFalse(result.success)
+            self.assertTrue(result.success)
             self.assertEqual(result.plan.contract.task_type, "research")
-            self.assertIn("Live web research is not configured", result.blocker)
-            self.assertIn("No information was fabricated", result.blocker)
+            self.assertEqual(result.research.sources[0].url, "https://example.com/source")
+            self.assertTrue(fcc.requests[0]["model"].endswith(":online"))
+            self.assertEqual(fcc.requests[0]["plugins"][0]["id"], "web")
+            self.assertIsNone(result.resolution)
             self.assertLess(result.duration_seconds, 1.0)
+
+    def test_research_and_implementation_adds_cited_context_before_worker(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / ".ai").mkdir()
+            (root / ".ai" / "routing.toml").write_text(
+                """[tiers.cheap]
+model = "test/cheap"
+[tiers.standard]
+model = "test/standard"
+[tiers.strong]
+model = "test/strong"
+[research]
+model = "open_router/google/gemini-3-flash-preview"
+""",
+                encoding="utf-8",
+            )
+            with (
+                patch("src.vibeflow.autonomous.IsolatedWorkspace", FakeWorkspace),
+                patch("src.vibeflow.autonomous.Resolver", CapturingResolver),
+            ):
+                result = AutonomousRunner(root, fcc_client=ResearchFCC()).run(
+                    "Search the web for a restaurant and create a website"
+                )
+
+            self.assertTrue(result.success)
+            self.assertEqual(result.plan.contract.task_type, "research-and-implementation")
+            research_items = [
+                item for item in CapturingResolver.context.items if item.kind == "research"
+            ]
+            self.assertEqual(len(research_items), 1)
+            self.assertIn("https://example.com/source", research_items[0].content)
+
+    def test_code_change_intent_is_separate_from_research_intent(self):
+        self.assertFalse(_requires_code_changes("Search the web for restaurants"))
+        self.assertTrue(_requires_code_changes("Search the web and create a website"))
     def test_folder_description_is_classified_as_documentation(self):
         options = _infer_plan_options("Write a description of the folder for visitors")
 

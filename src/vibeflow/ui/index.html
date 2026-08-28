@@ -175,18 +175,19 @@
           <div class="panel-heading">
             <div>
               <p class="eyebrow">AUTONOMOUS FLOW</p>
-              <h2 id="pipeline-title">From request to reviewed diff</h2>
+              <h2 id="pipeline-title">From request to researched, reviewed result</h2>
             </div>
             <span id="task-status-badge" class="status-pill idle">Waiting for a task</span>
           </div>
           <ol id="pipeline-steps" class="pipeline-steps">
             <li data-step="contract"><span class="step-index">01</span><div><strong>Contract</strong><small>Scope & approval</small></div><span class="step-state">—</span></li>
             <li data-step="route"><span class="step-index">02</span><div><strong>Route</strong><small>Model & strategy</small></div><span class="step-state">—</span></li>
-            <li data-step="workspace"><span class="step-index">03</span><div><strong>Isolate</strong><small>Safe worktree</small></div><span class="step-state">—</span></li>
-            <li data-step="worker"><span class="step-index">04</span><div><strong>Build</strong><small>Structured change</small></div><span class="step-state">—</span></li>
-            <li data-step="verify"><span class="step-index">05</span><div><strong>Verify</strong><small>Tests & checks</small></div><span class="step-state">—</span></li>
-            <li data-step="review"><span class="step-index">06</span><div><strong>Review</strong><small>Fresh context</small></div><span class="step-state">—</span></li>
-            <li data-step="promote"><span class="step-index">07</span><div><strong>Apply</strong><small>Hash-guarded</small></div><span class="step-state">—</span></li>
+            <li data-step="research"><span class="step-index">03</span><div><strong>Research</strong><small>Live cited sources</small></div><span class="step-state">—</span></li>
+            <li data-step="workspace"><span class="step-index">04</span><div><strong>Isolate</strong><small>Safe worktree</small></div><span class="step-state">—</span></li>
+            <li data-step="worker"><span class="step-index">05</span><div><strong>Build</strong><small>Structured change</small></div><span class="step-state">—</span></li>
+            <li data-step="verify"><span class="step-index">06</span><div><strong>Verify</strong><small>Tests & checks</small></div><span class="step-state">—</span></li>
+            <li data-step="review"><span class="step-index">07</span><div><strong>Review</strong><small>Fresh context</small></div><span class="step-state">—</span></li>
+            <li data-step="promote"><span class="step-index">08</span><div><strong>Apply</strong><small>Hash-guarded</small></div><span class="step-state">—</span></li>
           </ol>
           <div id="task-alert" class="task-alert" role="status" aria-live="polite" hidden>
             <div class="task-alert-mark" aria-hidden="true">!</div>
@@ -216,7 +217,7 @@
           <div class="panel-heading evidence-heading">
             <div>
               <p id="evidence-kicker" class="eyebrow accent">FINISHED TASK OUTPUT</p>
-              <h2 id="evidence-title">Your result, files, checks, and code</h2>
+          <h2 id="evidence-title">Your result, sources, files, checks, and code</h2>
             </div>
             <button id="copy-output" class="text-button" type="button" disabled>Copy full report</button>
           </div>

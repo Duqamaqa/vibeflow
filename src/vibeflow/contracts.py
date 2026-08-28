@@ -155,6 +155,11 @@ def contract_from_request(
             criteria = [
                 "The analysis uses live, attributable evidence and does not fabricate facts or contacts."
             ]
+        elif task_type == "research-and-implementation":
+            criteria = [
+                "The implementation uses live, attributable evidence and does not fabricate facts or contacts.",
+                "The requested code changes are implemented and deterministic verification passes.",
+            ]
         else:
             criteria = ["The requested outcome is implemented and deterministic verification passes."]
     return Contract(

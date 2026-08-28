@@ -80,6 +80,46 @@ def load_routing_preferences(path: str | Path) -> tuple[dict[str, str], dict[str
     return preferred, alternatives
 
 
+def load_research_preferences(path: str | Path) -> tuple[str, int]:
+    """Read the bounded OpenRouter model used for live web research."""
+
+    config_path = Path(path)
+    if not config_path.is_file():
+        raise ModelSelectionError(f"Routing config is missing: {config_path}")
+    try:
+        with config_path.open("rb") as handle:
+            config = tomllib.load(handle)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise ModelSelectionError(f"Cannot read routing config: {exc}") from exc
+    research = config.get("research", {})
+    if not isinstance(research, Mapping):
+        research = {}
+    model = research.get("model", "open_router/google/gemini-3-flash-preview")
+    if not isinstance(model, str) or not model.strip():
+        raise ModelSelectionError("Research model must be a non-empty string")
+    max_results = research.get("max_results", 8)
+    if isinstance(max_results, bool) or not isinstance(max_results, int):
+        raise ModelSelectionError("Research max_results must be an integer")
+    if not 1 <= max_results <= 10:
+        raise ModelSelectionError("Research max_results must be between 1 and 10")
+    return model.strip().removesuffix(":online"), max_results
+
+
+def resolve_research_model(routing_path: str | Path, live_payload: Any) -> tuple[str, int]:
+    """Validate the configured non-Claude OpenRouter research model against FCC."""
+
+    configured, max_results = load_research_preferences(routing_path)
+    normalized = configured.lower().strip("/")
+    if "open_router/" not in normalized or _is_claude_model_id(configured):
+        raise ModelSelectionError("Research model must be a non-Claude OpenRouter model")
+    available = extract_model_ids(live_payload)
+    if not available or _catalog_match(configured, available) is None:
+        raise ModelSelectionError(
+            f"No live FCC model matches the configured research model: {configured}"
+        )
+    return configured, max_results
+
+
 def resolve_tier_models(
     routing_path: str | Path,
     live_payload: Any,

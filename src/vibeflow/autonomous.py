@@ -7,11 +7,12 @@ from pathlib import Path
 import time
 from typing import Iterable
 
-from .context import ContextManager
+from .context import ContextBundle, ContextItem, ContextManager
 from .contracts import Ambiguity, Risk
 from .fcc_client import FCCClient
-from .model_selection import resolve_tier_models
+from .model_selection import resolve_research_model, resolve_tier_models
 from .orchestrator import Orchestrator, TaskPlan, TaskResult, TaskStatus
+from .research import OpenRouterResearcher, ResearchError, ResearchResult
 from .resolver import ResolutionStatus, Resolver, ResolverResult
 from .router import Router
 from .verifier import Verifier
@@ -45,9 +46,21 @@ class AutonomousRunner:
         routing_path = self.repo_root / ".ai" / "routing.toml"
         plan_options = _infer_plan_options(goal)
         needs_live_research = _requires_live_web_research(goal)
+        needs_code_changes = _requires_code_changes(goal)
         resolved_models = None
+        research_model = None
+        research_max_results = 8
         if needs_live_research:
-            router = Router(routing_path)
+            live_models = self.fcc_client.list_models()
+            research_model, research_max_results = resolve_research_model(
+                routing_path,
+                live_models,
+            )
+            if needs_code_changes:
+                resolved_models = resolve_tier_models(routing_path, live_models)
+                router = Router(routing_path, model_overrides=resolved_models)
+            else:
+                router = Router(routing_path)
         else:
             live_models = self.fcc_client.list_models()
             resolved_models = resolve_tier_models(routing_path, live_models)
@@ -65,14 +78,6 @@ class AutonomousRunner:
             selected_skills=selected_skills,
             **plan_options,
         )
-        if needs_live_research:
-            return self._blocked_result(
-                plan,
-                started,
-                "Live web research is not configured. Vibeflow cannot verify businesses, "
-                "website ownership, customer demand, or contact details without a connected "
-                "browser/research backend. No information was fabricated and no files were changed.",
-            )
         if plan.contract.requires_user_approval() and not approved:
             return TaskResult(
                 TaskStatus.NEEDS_APPROVAL,
@@ -80,6 +85,27 @@ class AutonomousRunner:
                 time.monotonic() - started,
                 blocker="Contract requires explicit approval. Re-run with --approve after reviewing the plan.",
             )
+
+        research: ResearchResult | None = None
+        if needs_live_research:
+            try:
+                research = OpenRouterResearcher(
+                    self.fcc_client,
+                    max_results=research_max_results,
+                ).research(goal, research_model or "")
+            except (ResearchError, RuntimeError, TypeError, ValueError) as exc:
+                return self._blocked_result(
+                    plan,
+                    started,
+                    f"Live web research failed safely: {exc}. No information was fabricated and no files were changed.",
+                )
+            if not needs_code_changes:
+                return TaskResult(
+                    TaskStatus.DONE,
+                    plan,
+                    time.monotonic() - started,
+                    research=research,
+                )
 
         try:
             with IsolatedWorkspace(self.repo_root) as workspace:
@@ -89,6 +115,8 @@ class AutonomousRunner:
                         plan.contract,
                         context_files,
                     )
+                    if research is not None:
+                        context = _add_research_context(context, research)
                     plan = replace(plan, context=context)
                     plan = orchestrator.prepare_skills(plan)
                     plan = orchestrator.prepare_strategy(plan)
@@ -108,6 +136,7 @@ class AutonomousRunner:
                         plan,
                         started,
                         f"Worker pipeline failed safely: {exc}",
+                        research=research,
                     )
                 if not resolution.success:
                     return TaskResult(
@@ -116,6 +145,7 @@ class AutonomousRunner:
                         time.monotonic() - started,
                         resolution=resolution,
                         blocker=resolution.blocker,
+                        research=research,
                     )
                 try:
                     promoted = workspace.promote()
@@ -124,6 +154,7 @@ class AutonomousRunner:
                         plan,
                         started,
                         f"Safe promotion failed: {exc}",
+                        research=research,
                     )
                 worker = replace(
                     resolution.worker,
@@ -137,12 +168,14 @@ class AutonomousRunner:
                 plan,
                 started,
                 f"Safe workspace failed: {exc}",
+                research=research,
             )
         return TaskResult(
             TaskStatus.DONE,
             plan,
             time.monotonic() - started,
             resolution=resolution,
+            research=research,
         )
 
     @staticmethod
@@ -150,6 +183,8 @@ class AutonomousRunner:
         plan: TaskPlan,
         started: float,
         blocker: str,
+        *,
+        research: ResearchResult | None = None,
     ) -> TaskResult:
         blocked = ResolverResult(
             ResolutionStatus.BLOCKED,
@@ -163,6 +198,7 @@ class AutonomousRunner:
             time.monotonic() - started,
             resolution=blocked,
             blocker=blocker,
+            research=research,
         )
 
 
@@ -201,7 +237,7 @@ def _infer_plan_options(goal: str) -> dict[str, object]:
     )
     risk = Risk.HIGH if any(term in normalized for term in high_risk_terms) else Risk.LOW
     if _requires_live_web_research(goal):
-        task_type = "research"
+        task_type = "research-and-implementation" if _requires_code_changes(goal) else "research"
     elif any(term in normalized for term in ("architecture", "security", "migration")):
         task_type = "architecture" if "architecture" in normalized else "security"
     elif any(
@@ -241,7 +277,10 @@ def _requires_live_web_research(goal: str) -> bool:
         term in normalized
         for term in (
             "search the web",
+            "research the web",
             "search online",
+            "research online",
+            "web research",
             "browse the web",
             "look online",
             "find businesses",
@@ -252,3 +291,44 @@ def _requires_live_web_research(goal: str) -> bool:
             "find their whatsapp",
         )
     )
+
+
+def _requires_code_changes(goal: str) -> bool:
+    normalized = goal.lower()
+    return any(
+        term in normalized
+        for term in (
+            "build a website",
+            "build the website",
+            "create a website",
+            "create website",
+            "create websites",
+            "build an app",
+            "create an app",
+            "implement",
+            "write code",
+            "change the code",
+            "update the code",
+            "add a feature",
+            "fix the code",
+        )
+    )
+
+
+def _add_research_context(
+    context: ContextBundle,
+    research: ResearchResult,
+) -> ContextBundle:
+    source_lines = "\n".join(
+        f"- {source.title}: {source.url}" for source in research.sources
+    )
+    item = ContextItem(
+        name="live-web-research",
+        content=f"{research.report}\n\nCITED SOURCE URLS:\n{source_lines}",
+        priority=99,
+        kind="research",
+    )
+    return ContextBundle(
+        items=[*context.items, item],
+        max_tokens=context.max_tokens,
+    ).trim()

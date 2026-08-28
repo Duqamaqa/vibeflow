@@ -65,6 +65,10 @@ class TestDashboardService(DashboardTestCase):
 
         self.assertTrue(payload["fcc"]["healthy"])
         self.assertEqual(payload["routing"]["tiers"]["cheap"], "provider/cheap")
+        self.assertEqual(
+            payload["routing"]["research"]["model"],
+            "open_router/google/gemini-3-flash-preview",
+        )
         self.assertFalse(payload["safety"]["credentials_in_browser"])
         self.assertFalse(payload["safety"]["auto_push"])
         engines = {engine["id"]: engine for engine in payload["engines"]}
@@ -228,7 +232,7 @@ class TestDashboardHTTP(DashboardTestCase):
         self.assertIn(b"YOUR DAILY CODING FRONT DOOR", body)
         self.assertIn(b"prompt-input", body)
         self.assertIn(b"FINISHED OUTPUT READY", body)
-        self.assertIn(b"Your result, files, checks, and code", body)
+        self.assertIn(b"Your result, sources, files, checks, and code", body)
         self.assertIn("frame-ancestors 'none'", headers["Content-Security-Policy"])
         self.assertEqual(headers["X-Frame-Options"], "DENY")
 
@@ -362,8 +366,9 @@ class TestDashboardAssets(unittest.TestCase):
         self.assertNotIn("sessionStorage", javascript)
         self.assertIn('skills: [...state.selectedSkills]', javascript)
         self.assertIn("function explainTaskFailure(task)", javascript)
-        self.assertIn("Live web research is not connected", javascript)
-        self.assertIn("one website prototype per task", javascript)
+        self.assertIn("Live research could not be verified", javascript)
+        self.assertIn("Research sources", javascript)
+        self.assertIn('data-step="research"', html)
         self.assertIn("Why Vibeflow stopped and what to do next", javascript)
         self.assertIn("function repositoryNeedsSetup", javascript)
         self.assertIn("initialize_git: initializeGit", javascript)

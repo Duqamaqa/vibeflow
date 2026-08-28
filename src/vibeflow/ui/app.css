@@ -206,6 +206,7 @@ kbd { padding: 2px 5px; border: 1px solid var(--line); border-bottom-color: var(
 .model-card[data-tier="cheap"] { --tier-color: var(--acid); }
 .model-card[data-tier="standard"] { --tier-color: var(--blue); }
 .model-card[data-tier="strong"] { --tier-color: var(--coral); }
+.model-card[data-tier="research"] { --tier-color: #ffc457; }
 .model-skeleton { height: 74px; background: linear-gradient(90deg, var(--panel) 25%, var(--panel-raised) 45%, var(--panel) 65%); background-size: 300% 100%; animation: shimmer 1.6s infinite; }
 .rail-footnote { margin: 23px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 
@@ -264,7 +265,7 @@ kbd { padding: 2px 5px; border: 1px solid var(--line); border-bottom-color: var(
 .status-pill.running { border-color: rgba(125,183,255,.4); color: var(--blue); }
 .status-pill.done, .status-pill.planned { border-color: rgba(200,255,74,.38); color: var(--acid); }
 .status-pill.blocked, .status-pill.needs-approval { border-color: rgba(255,117,87,.45); color: var(--coral); }
-.pipeline-steps { display: grid; grid-template-columns: repeat(7, minmax(84px, 1fr)); margin: 38px 0 0; padding: 0; list-style: none; }
+.pipeline-steps { display: grid; grid-template-columns: repeat(8, minmax(78px, 1fr)); margin: 38px 0 0; padding: 0; list-style: none; }
 .pipeline-steps li { position: relative; min-height: 112px; padding: 16px 11px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); border-left: 1px solid var(--line); background: rgba(255,255,255,.012); }
 .pipeline-steps li:last-child { border-right: 1px solid var(--line); }
 .step-index { color: #8b9286; font-family: var(--mono); font-size: 11px; }
@@ -316,6 +317,8 @@ kbd { padding: 2px 5px; border: 1px solid var(--line); border-bottom-color: var(
 .summary-section { margin-top: 20px; padding: 22px; border: 1px solid var(--line); }
 .summary-section h3 { margin: 0 0 12px; font-size: 16px; }
 .summary-section p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; white-space: pre-wrap; }
+.research-sources { display: grid; gap: 10px; margin: 15px 0 0; padding: 0; list-style: none; }
+.research-sources a { color: var(--acid); font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
 .file-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .file-chip { padding: 7px 10px; color: var(--acid); background: var(--acid-soft); font-family: var(--mono); font-size: 12px; }
 .code-panel { max-height: 620px; overflow: auto; margin: 0; padding: 22px; border: 1px solid var(--line); color: #dce1d3; background: #080a09; font-family: var(--mono); font-size: 13px; line-height: 1.7; white-space: pre; }
