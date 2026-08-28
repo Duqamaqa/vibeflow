@@ -1,3 +1,4 @@
+import hashlib
 import tempfile
 from pathlib import Path
 import unittest
@@ -30,6 +31,16 @@ class TestContextManager(unittest.TestCase):
     def test_paths_cannot_escape_repository(self):
         with self.assertRaises(ContextError):
             self.manager.read_file(self.root.parent / "outside.txt")
+
+    def test_active_file_context_includes_copyable_current_hash(self):
+        contract = Contract("Update active file", acceptance_criteria=["tests pass"])
+
+        bundle = self.manager.build_context(contract, ["active.py"])
+
+        expected = hashlib.sha256(b"print('active')").hexdigest()
+        hash_items = [item for item in bundle.items if item.kind == "file-hash"]
+        self.assertEqual(len(hash_items), 1)
+        self.assertIn(expected, hash_items[0].content)
 
 
 if __name__ == "__main__":

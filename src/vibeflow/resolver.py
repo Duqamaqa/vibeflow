@@ -237,11 +237,20 @@ class Resolver:
                     budget=None if self.budget_ledger is None else self.budget_ledger.snapshot,
                 )
             if self.change_applier is not None and self.change_applier.touched_files:
-                context = self.context_manager.build_context(
+                refreshed = self.context_manager.build_context(
                     contract,
                     self.change_applier.touched_files,
                     max_tokens=context.max_tokens,
                 )
+                preserved = [
+                    item
+                    for item in context.items
+                    if item.kind in {"research", "skill", "strategy"}
+                ]
+                context = ContextBundle(
+                    items=[*refreshed.items, *preserved],
+                    max_tokens=context.max_tokens,
+                ).trim()
             current = self.router.escalate(current, "review or verification failure")
 
         self._rollback()

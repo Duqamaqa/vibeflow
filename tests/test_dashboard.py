@@ -366,6 +366,8 @@ class TestDashboardAssets(unittest.TestCase):
         self.assertNotIn("sessionStorage", javascript)
         self.assertIn('skills: [...state.selectedSkills]', javascript)
         self.assertIn("function explainTaskFailure(task)", javascript)
+        self.assertIn("genericResolverLimit", javascript)
+        self.assertIn("contacts need verification", javascript)
         self.assertIn("Live research could not be verified", javascript)
         self.assertIn("Research sources", javascript)
         self.assertIn("function researchDisplayText(report)", javascript)

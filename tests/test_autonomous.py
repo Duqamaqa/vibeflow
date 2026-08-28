@@ -221,6 +221,13 @@ model = "open_router/google/gemini-3-flash-preview"
     def test_code_change_intent_is_separate_from_research_intent(self):
         self.assertFalse(_requires_code_changes("Search the web for restaurants"))
         self.assertTrue(_requires_code_changes("Search the web and create a website"))
+
+    def test_outreach_file_request_triggers_research_and_implementation(self):
+        options = _infer_plan_options(
+            "Create a file for each business; I need an email or WhatsApp contact"
+        )
+
+        self.assertEqual(options["task_type"], "research-and-implementation")
     def test_folder_description_is_classified_as_documentation(self):
         options = _infer_plan_options("Write a description of the folder for visitors")
 

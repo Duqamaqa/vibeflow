@@ -278,6 +278,7 @@ def _requires_live_web_research(goal: str) -> bool:
         for term in (
             "search the web",
             "research the web",
+            "research into",
             "search online",
             "research online",
             "web research",
@@ -289,6 +290,10 @@ def _requires_live_web_research(goal: str) -> bool:
             "find contact details",
             "find their email",
             "find their whatsapp",
+            "need an email",
+            "need a whatsapp",
+            "email or a whatsapp",
+            "email or whatsapp",
         )
     )
 
@@ -303,6 +308,8 @@ def _requires_code_changes(goal: str) -> bool:
             "create a website",
             "create website",
             "create websites",
+            "create a file",
+            "create the file",
             "build an app",
             "create an app",
             "implement",

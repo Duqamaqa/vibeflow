@@ -477,6 +477,8 @@ function taskFailureText(task) {
   const resolution = data.resolution || {};
   const worker = resolution.worker || {};
   const review = resolution.review || {};
+  const genericResolverLimit = String(data.blocker || resolution.blocker || "").toLowerCase().includes("resolver iteration or escalation limit reached");
+  if (genericResolverLimit && review.feedback) return review.feedback;
   return task.error || data.blocker || resolution.blocker || review.feedback || worker.summary || "Vibeflow stopped before it could safely finish the task.";
 }
 
@@ -510,14 +512,14 @@ function explainTaskFailure(task) {
   if (normalized.includes("worktree") || normalized.includes("workspace") || normalized.includes("git repository") || normalized.includes("isolate")) {
     return { stageIndex: 3, reason, action: "Confirm the selected folder is an accessible Git repository, then retry." };
   }
-  if (worker.success === false || normalized.includes("structured proposal") || normalized.includes("invalid json") || normalized.includes("worker")) {
-    return { stageIndex: 4, reason, action: "The coding model did not return a safe structured change. Retry or let routing escalate to a stronger model." };
-  }
-  if (verification.accepted === false || /\b(test|tests|lint|typecheck|verification|build)\b/.test(normalized)) {
+  if (verification.accepted === false || (verification.accepted !== true && /\b(test|tests|lint|typecheck|verification|build)\b/.test(normalized))) {
     return { stageIndex: 5, reason, action: "Open the task details to see which deterministic check failed, then ask Vibeflow to fix that failure." };
   }
   if (review.approved === false || normalized.includes("review") || normalized.includes("resolver") || normalized.includes("iteration")) {
-    return { stageIndex: 6, reason, action: "The independent reviewer rejected the change and the repair limit was reached. Use its feedback in a new prompt." };
+    return { stageIndex: 6, reason, action: "The independent reviewer found missing or unverifiable requirements. Use its required changes in a new prompt; Vibeflow will run live research when contacts need verification." };
+  }
+  if (worker.success === false || normalized.includes("structured proposal") || normalized.includes("invalid json") || normalized.includes("worker")) {
+    return { stageIndex: 4, reason, action: "The coding model did not return a safe structured change. Retry or let routing escalate to a stronger model." };
   }
   if (normalized.includes("promot") || normalized.includes("apply") || normalized.includes("hash") || normalized.includes("dirty") || normalized.includes("stale")) {
     return { stageIndex: 7, reason, action: "Your project changed while Vibeflow was working, so safe apply was cancelled. Review local changes and retry." };
@@ -602,7 +604,10 @@ function renderEvidence(result, error, task) {
   }
 
   elements.summaryTab.replaceChildren(grid);
-  addSummarySection("Outcome", error || data.blocker || resolution.blocker || worker.summary || review.feedback || (research.report ? researchDisplayText(research.report) : "") || (task.action === "plan" ? "Plan prepared without changing files." : "Task completed."));
+  const outcome = review.approved === false
+    ? review.feedback
+    : error || data.blocker || resolution.blocker || worker.summary || (research.report ? researchDisplayText(research.report) : "") || (task.action === "plan" ? "Plan prepared without changing files." : "Task completed.");
+  addSummarySection("Outcome", outcome);
   if (research.report) addResearchSection(research);
   if (typeof review.approved === "boolean") {
     addSummarySection("Reviewer", reviewState + (review.feedback ? ` — ${review.feedback}` : ""));

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -216,5 +217,14 @@ class ContextManager:
             seen.add(file_path)
             content = self.read_file(file_path)
             if content is not None:
+                digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                items.append(
+                    ContextItem(
+                        f"{file_path}.sha256",
+                        f"PATH: {file_path}\nEXPECTED_SHA256: {digest}",
+                        76,
+                        "file-hash",
+                    )
+                )
                 items.append(ContextItem(file_path, content, 75, "file"))
         return ContextBundle(items=items, max_tokens=max_tokens).trim()

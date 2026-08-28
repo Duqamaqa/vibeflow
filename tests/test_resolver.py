@@ -6,7 +6,7 @@ import unittest
 
 from vibeflow.budget import BudgetLedger, BudgetPolicy
 from vibeflow.changes import ChangeProposal, FileOperation, StructuredChangeApplier
-from vibeflow.context import ContextBundle, ContextItem
+from vibeflow.context import ContextBundle, ContextItem, ContextManager
 from vibeflow.contracts import Contract
 from vibeflow.resolver import ResolutionStatus, Resolver
 from vibeflow.reviewer import ReviewResult
@@ -19,9 +19,11 @@ class FakeWorker:
     def __init__(self, results):
         self.results = deque(results)
         self.models = []
+        self.contexts = []
 
     def execute(self, contract, model, context, *, feedback=()):
         self.models.append(model)
+        self.contexts.append(context)
         return self.results.popleft()
 
 
@@ -247,6 +249,51 @@ class TestResolver(unittest.TestCase):
             self.assertTrue(result.success)
             self.assertEqual(path.read_text(encoding="utf-8"), "fixed\n")
             self.assertIn("+fixed", result.worker.diff)
+
+    def test_resolver_retry_preserves_research_and_supplies_current_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "outreach.md"
+            path.write_text("old\n", encoding="utf-8")
+            first = ChangeProposal((FileOperation(
+                "update",
+                "outreach.md",
+                content="draft\n",
+                expected_sha256=hashlib.sha256(b"old\n").hexdigest(),
+            ),))
+            second = ChangeProposal((FileOperation(
+                "update",
+                "outreach.md",
+                content="final\n",
+                expected_sha256=hashlib.sha256(b"draft\n").hexdigest(),
+            ),))
+            workers = FakeWorker([
+                WorkerResult(True, "draft", proposal=first),
+                WorkerResult(True, "final", proposal=second),
+            ])
+            context = ContextBundle([
+                ContextItem("task", "contract", 100, "contract"),
+                ContextItem("live-web-research", "cited evidence", 99, "research"),
+            ])
+            resolver = Resolver(
+                context_manager=ContextManager(root),
+                worker=workers,
+                reviewer_factory=ReviewerFactory([
+                    ReviewResult(False, "needs contact", ("add contact",), 1.0),
+                    ReviewResult(True, "approved", (), 1.0),
+                ]),
+                verifier=FakeVerifier(),
+                router=self.router,
+                max_iterations=2,
+                change_applier=StructuredChangeApplier(root),
+            )
+
+            result = resolver.resolve(self.contract, self.base, context)
+
+            self.assertTrue(result.success)
+            retry_context = workers.contexts[1].render()
+            self.assertIn("cited evidence", retry_context)
+            self.assertIn(hashlib.sha256(b"draft\n").hexdigest(), retry_context)
 
 
 if __name__ == "__main__":
