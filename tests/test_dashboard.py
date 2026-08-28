@@ -368,6 +368,7 @@ class TestDashboardAssets(unittest.TestCase):
         self.assertIn("function explainTaskFailure(task)", javascript)
         self.assertIn("Live research could not be verified", javascript)
         self.assertIn("Research sources", javascript)
+        self.assertIn("function researchDisplayText(report)", javascript)
         self.assertIn('data-step="research"', html)
         self.assertIn("Why Vibeflow stopped and what to do next", javascript)
         self.assertIn("function repositoryNeedsSetup", javascript)

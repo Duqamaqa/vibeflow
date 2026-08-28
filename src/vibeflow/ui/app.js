@@ -461,9 +461,10 @@ function showTaskComplete(task) {
   elements.taskCompleteTitle.textContent = planned
     ? "Plan finished. Your output is ready."
     : "Task finished. Your output is ready.";
+  const researchSummary = research.report ? excerpt(researchDisplayText(research.report), 420) : "";
   elements.taskCompleteSummary.textContent = worker.summary || review.feedback || data.summary || (planned
     ? "Vibeflow prepared the contract and route without changing files."
-    : research.report || "Vibeflow completed, verified, reviewed, and safely applied the task.");
+    : researchSummary || "Vibeflow completed, verified, reviewed, and safely applied the task.");
   elements.taskCompleteMeta.textContent = planned
     ? "No files changed · plan only"
     : researchOnly
@@ -579,7 +580,7 @@ function renderEvidence(result, error, task) {
     ? "Approval is needed before anything changes"
     : stopped
       ? "Why Vibeflow stopped and what to do next"
-      : "Your result, files, checks, and code";
+      : "Your result, sources, files, checks, and code";
 
   const grid = document.createElement("div");
   grid.className = "summary-grid";
@@ -601,7 +602,7 @@ function renderEvidence(result, error, task) {
   }
 
   elements.summaryTab.replaceChildren(grid);
-  addSummarySection("Outcome", error || data.blocker || resolution.blocker || worker.summary || review.feedback || research.report || (task.action === "plan" ? "Plan prepared without changing files." : "Task completed."));
+  addSummarySection("Outcome", error || data.blocker || resolution.blocker || worker.summary || review.feedback || (research.report ? researchDisplayText(research.report) : "") || (task.action === "plan" ? "Plan prepared without changing files." : "Task completed."));
   if (research.report) addResearchSection(research);
   if (typeof review.approved === "boolean") {
     addSummarySection("Reviewer", reviewState + (review.feedback ? ` — ${review.feedback}` : ""));
@@ -663,6 +664,21 @@ function addResearchSection(research) {
   }
   section.append(heading, list);
   elements.summaryTab.append(section);
+}
+
+function researchDisplayText(report) {
+  return String(report || "")
+    .replace(/\[([^\]]+)\]\(https?:\/\/[^\s)]+\)/g, "$1")
+    .replace(/\*\*/g, "")
+    .replace(/`/g, "")
+    .replace(/^\s*[*-]\s+/gm, "• ")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*\*{3,}\s*$/gm, "")
+    .trim();
+}
+
+function excerpt(text, maximum) {
+  return text.length <= maximum ? text : `${text.slice(0, maximum).trimEnd()}…`;
 }
 
 function switchTab(tabName) {
